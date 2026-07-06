@@ -10,6 +10,13 @@ import { unpackVoxelKey, voxelKey } from './voxel';
 export interface RegionOptions {
   /** components smaller than this are noise and dropped */
   minRegionVoxels?: number;
+  /**
+   * regions with mean point-support confidence below this are dropped.
+   * Calibrated empirically (2026-07-05): grazing-angle sampling flicker
+   * produces ghosts at confidence <= 0.37 while genuine changes measured
+   * >= 0.51 across both scenario families — 0.45 splits the gap.
+   */
+  minConfidence?: number;
   /** shifted pairing: |volume ratio - 1| must be below this */
   shiftVolumeTolerance?: number;
   /** shifted pairing: centroid distance cap, meters */
@@ -18,6 +25,7 @@ export interface RegionOptions {
 
 export const REGION_DEFAULTS: Required<RegionOptions> = {
   minRegionVoxels: 4,
+  minConfidence: 0.45,
   shiftVolumeTolerance: 0.35,
   shiftMaxDistanceM: 2,
 };
@@ -108,9 +116,11 @@ export function extractRegions(
 ): ChangeRegion[] {
   const opts = { ...REGION_DEFAULTS, ...options };
   const added = connectedComponents(addedKeys, opts.minRegionVoxels)
-    .map((r) => toChangeRegion(r, 'added', voxelSizeM, supportAdded, minPointsPerVoxel));
+    .map((r) => toChangeRegion(r, 'added', voxelSizeM, supportAdded, minPointsPerVoxel))
+    .filter((r) => r.confidence >= opts.minConfidence);
   const removed = connectedComponents(removedKeys, opts.minRegionVoxels)
-    .map((r) => toChangeRegion(r, 'removed', voxelSizeM, supportRemoved, minPointsPerVoxel));
+    .map((r) => toChangeRegion(r, 'removed', voxelSizeM, supportRemoved, minPointsPerVoxel))
+    .filter((r) => r.confidence >= opts.minConfidence);
 
   const regions: ChangeRegion[] = [...added, ...removed];
 

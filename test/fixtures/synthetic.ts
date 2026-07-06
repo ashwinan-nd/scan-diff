@@ -7,7 +7,7 @@
  */
 
 import type { Pose } from '../../src/core/types';
-import { fromYawTranslation } from '../../src/core/mat4';
+import { fromYawPitchTranslation, fromYawTranslation } from '../../src/core/mat4';
 import type { SceneBox, SyntheticScene } from '../../src/capture/mock';
 
 export const box = (
@@ -41,19 +41,29 @@ export function enclosureScene(objects: SceneBox[] = []): SyntheticScene {
 export function subjectScene(extras: SceneBox[] = []): SyntheticScene {
   return {
     boxes: [
-      box([-5, -0.05, -5], [5, 0, 5]),                       // ground
+      // 6 x 6 m ground: big enough to orbit on, small enough that synthetic
+      // captures keep realistic point density per voxel
+      box([-3, -0.05, -3], [3, 0, 3]),
       box([-0.9, 0, -0.3], [0.9, 1.2, 0.3]),                // subject body
       ...extras,
     ],
   };
 }
 
-/** Pan-in-place trajectory: stand at `at`, rotate `steps` view directions over 360°. */
+/**
+ * Pan-in-place trajectory: stand at `at`, sweep 360° twice — once level and
+ * once pitched 35° down, the way a person actually scans a space (a level
+ * pan from standing height never puts the floor in the frustum; found the
+ * hard way, see RESUME.md).
+ */
 export function panTrajectory(at: [number, number, number], steps = 24): Pose[] {
   const poses: Pose[] = [];
-  for (let i = 0; i < steps; i++) {
-    const yaw = (i / steps) * Math.PI * 2;
-    poses.push({ matrix: fromYawTranslation(yaw, at) });
+  const half = Math.ceil(steps / 2);
+  for (const pitch of [0, (-35 * Math.PI) / 180]) {
+    for (let i = 0; i < half; i++) {
+      const yaw = (i / half) * Math.PI * 2;
+      poses.push({ matrix: fromYawPitchTranslation(yaw, pitch, at) });
+    }
   }
   return poses;
 }
@@ -66,13 +76,15 @@ export function orbitTrajectory(
   steps = 24,
 ): Pose[] {
   const poses: Pose[] = [];
+  // pitch down toward the subject's mid-height so low geometry stays in frame
+  const pitch = -Math.atan2(height - center[1], radius);
   for (let i = 0; i < steps; i++) {
     const a = (i / steps) * Math.PI * 2;
     const x = center[0] + radius * Math.sin(a);
     const z = center[2] + radius * Math.cos(a);
     // camera at (x, height, z) looking at center: default camera looks down -z;
     // yaw that turns -z toward the center is exactly `a`
-    poses.push({ matrix: fromYawTranslation(a, [x, height, z]) });
+    poses.push({ matrix: fromYawPitchTranslation(a, pitch, [x, height, z]) });
   }
   return poses;
 }

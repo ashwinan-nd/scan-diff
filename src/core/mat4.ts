@@ -75,6 +75,17 @@ export function fromYawTranslation(yaw: number, t: Vec3): Mat4 {
   return fromRotationTranslation([c, 0, s, 0, 1, 0, -s, 0, c], t);
 }
 
+/** Yaw about +y then pitch about the camera's local x (negative pitch looks down). */
+export function fromYawPitchTranslation(yaw: number, pitch: number, t: Vec3): Mat4 {
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  // R = Ry(yaw) · Rx(pitch), row-major
+  return fromRotationTranslation(
+    [cy, sy * sp, sy * cp, 0, cp, -sp, -sy, cy * sp, cy * cp],
+    t,
+  );
+}
+
 /** Angle of the rotation part, radians (from trace). */
 export function rotationAngle(m: Mat4): number {
   const tr = m[0]! + m[5]! + m[10]!;

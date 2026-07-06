@@ -14,7 +14,7 @@
 import type { Intrinsics, Keyframe } from '../core/types';
 import { invertRigid, type Mat4 } from '../core/mat4';
 import { projectPoint } from '../capture/unproject';
-import { VoxelGrid, unpackVoxelKey, voxelKey } from './voxel';
+import { VoxelGrid, unpackVoxelKey, voxelKey, voxelKey as voxelKeyOf } from './voxel';
 
 export interface DiffOptions {
   voxelSizeM?: number;
@@ -56,17 +56,47 @@ function frusta(keyframes: Keyframe[]): Frustum[] {
   }));
 }
 
-/** Was the voxel center inside any keyframe's view frustum within range? */
+/**
+ * Was the voxel center actually SEEN by any keyframe of the observing
+ * session? Frustum inclusion alone is not enough: geometry the session
+ * captured can occlude the voxel (the floor under a newly added object sits
+ * in-frustum but hidden — without this check it ghosts as "removed", and the
+ * ghost can even pair with the true addition into a fake "shifted").
+ * Visibility = in-frame, in-range, and the segment camera→voxel passes no
+ * occupied voxel of the observing session's own grid (sampled at half-voxel
+ * steps; the target's immediate neighborhood is exempt — it IS the surface).
+ */
 function observed(
   center: [number, number, number],
   fs: Frustum[],
+  camPositions: Array<[number, number, number]>,
+  observerGrid: VoxelGrid,
   rangeM: number,
 ): boolean {
-  for (const f of fs) {
+  const s = observerGrid.voxelSizeM;
+  for (let i = 0; i < fs.length; i++) {
+    const f = fs[i]!;
     const p = projectPoint(center, f.camToWorldInv, f.intrinsics, f.imageSize);
     if (!p) continue;
     if (p.depth > rangeM) continue;
-    if (p.u >= 0 && p.u < f.imageSize.w && p.v >= 0 && p.v < f.imageSize.h) return true;
+    if (p.u < 0 || p.u >= f.imageSize.w || p.v < 0 || p.v >= f.imageSize.h) continue;
+
+    // occlusion march from the camera toward the voxel center
+    const cam = camPositions[i]!;
+    const dx = center[0] - cam[0], dy = center[1] - cam[1], dz = center[2] - cam[2];
+    const dist = Math.hypot(dx, dy, dz);
+    // stop 1.5 voxels short: the target surface must not occlude itself
+    const stop = Math.max(0, dist - 1.5 * s);
+    const step = s / 2;
+    let blocked = false;
+    for (let t = step; t < stop; t += step) {
+      const k = t / dist;
+      const ix = Math.floor((cam[0] + dx * k) / s);
+      const iy = Math.floor((cam[1] + dy * k) / s);
+      const iz = Math.floor((cam[2] + dz * k) / s);
+      if (observerGrid.isOccupied(voxelKeyOf(ix, iy, iz))) { blocked = true; break; }
+    }
+    if (!blocked) return true;
   }
   return false;
 }
@@ -91,6 +121,11 @@ export function diffOccupancy(
     return [(ix + 0.5) * s, (iy + 0.5) * s, (iz + 0.5) * s];
   };
 
+  const camPos = (kfs: Keyframe[]): Array<[number, number, number]> =>
+    kfs.map((kf) => [kf.pose.matrix[12]!, kf.pose.matrix[13]!, kf.pose.matrix[14]!]);
+  const camsA = camPos(keyframesA);
+  const camsB = camPos(keyframesB);
+
   const removedKeys: number[] = [];
   let aObservedByB = 0;
   let aOcc = 0;
@@ -101,11 +136,13 @@ export function diffOccupancy(
       aObservedByB++; // matched occupancy implies B saw it
       continue;
     }
-    if (observed(center(k), fsB, opts.observationRangeM)) {
+    // "removed" needs B to have genuinely seen the empty space — occlusion
+    // checked against B's OWN geometry
+    if (observed(center(k), fsB, camsB, gridB, opts.observationRangeM)) {
       aObservedByB++;
       removedKeys.push(k);
     }
-    // else: coverage gap — B never looked there; not a change
+    // else: coverage gap — B never saw there; not a change
   }
 
   const addedKeys: number[] = [];
@@ -118,7 +155,8 @@ export function diffOccupancy(
       bObservedByA++;
       continue;
     }
-    if (observed(center(k), fsA, opts.observationRangeM)) {
+    // "added" needs A to have seen that space empty — occlusion vs A's geometry
+    if (observed(center(k), fsA, camsA, gridA, opts.observationRangeM)) {
       bObservedByA++;
       addedKeys.push(k);
     }
