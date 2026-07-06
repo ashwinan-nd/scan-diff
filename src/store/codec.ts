@@ -35,10 +35,9 @@ export function encodeScan(s: ScanSession): StoredScan {
     id: s.id,
     label: s.label,
     createdAt: s.createdAt,
-    positions: s.cloud.positions.buffer.slice(
-      s.cloud.positions.byteOffset,
-      s.cloud.positions.byteOffset + s.cloud.count * 3 * 4,
-    ),
+    // explicit copy into a fresh ArrayBuffer: detaches from any view offset
+    // and satisfies TS (a typed array's .buffer may be a SharedArrayBuffer)
+    positions: new Float32Array(s.cloud.positions.subarray(0, s.cloud.count * 3)).buffer as ArrayBuffer,
     pointCount: s.cloud.count,
     keyframes: s.keyframes.map((kf) => ({
       id: kf.id,

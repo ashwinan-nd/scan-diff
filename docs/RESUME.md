@@ -49,3 +49,14 @@ NEXT: src/align (umeyama.ts, coarse.ts, icp.ts, quality.ts) + tests (known-trans
 - Evidence: 76/76 tests across 6 files, tsc clean. Commit 5a6199c + this one.
 
 NEXT: src/store (IndexedDB + codec), src/ui PWA (scan/library/compare/report screens), vite config, manifest, SW. Then registries + closing report.
+
+## 6 — Session close at weekly limit (2026-07-06)
+
+- store/codec.ts written (versioned encode/decode, corruption guards) — committed, tests not yet written.
+- Closing deliverables shipped: README.md, docs/STATUS.md (closing report), docs/SKILLS.md, docs/AGENTS.md, .claude/agents/{capture-qa,alignment-tuner,diff-calibrator,report-auditor}.md.
+- Remote added: https://github.com/ashwinan-nd/scan-diff, branch `build` pushed. main = scaffold only; merge via PR on GitHub (no gh CLI here; never pushing main directly).
+- Stopped at 97% weekly limit, NOT completion. Resume point: docs/STATUS.md "Stubbed" list, item 1 (src/store/db.ts + store tests), then PWA UI.
+
+Evidence: final suite 76/76 (`npx vitest run`), `npx tsc -p tsconfig.json` exit 0, `git push` output in session log.
+
+NEXT (for resuming session): read ARCHITECTURE.md → this file → build src/store/db.ts + test/store.test.ts → PWA UI per ARCHITECTURE §3/§4 → real-device WebXR smoke test.
