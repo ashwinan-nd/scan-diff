@@ -152,7 +152,7 @@ Goal: transform T mapping session-B world frame → session-A world frame.
 **ICP refine** (`icp.ts`, trimmed point-to-point):
 1. Voxel-downsample both clouds to 2 cm (dedupe by voxel, centroid per voxel) — LingBot benchmark pattern.
 2. Build kd-tree over cloud A once.
-3. Iterate ≤ 50: for each B point (transformed by current T), NN in A; keep pairs with dist < d_max (start 0.5 m, × 0.9 per iteration, floor 0.05 m); of those keep best 80% by distance (trim — handles partial overlap + genuine scene changes, which are outliers to alignment); solve rigid Umeyama (no scale — metric sensors) on trimmed set; update T; converge when |ΔRMSE| < 1e-4 m or rotation update < 0.01°.
+3. Iterate ≤ 100 (was 50; parameter sweep showed trimmed sets converge at ~60–70 iterations when scene changes are present): for each B point (transformed by current T), NN in A; keep pairs with dist < d_max (start 0.5 m, × 0.9 per iteration, floor 0.05 m); of those keep best 80% by distance (trim — handles partial overlap + genuine scene changes, which are outliers to alignment); solve rigid Umeyama (no scale — metric sensors) on trimmed set; update T; converge when |ΔRMSE| < 1e-4 m or rotation update < 0.01°.
 4. `umeyama.ts`: centroids, covariance H = Σ(a−ā)(b−b̄)ᵀ, SVD(H) via `svd3.ts` one-sided Jacobi, R = V·diag(1,1,det(VUᵀ))·Uᵀ, t = ā − R·b̄.
 
 **Quality** (`quality.ts`): final inlier RMSE (< 0.03 good, < 0.08 usable, else poor), overlap ratio = fraction of B points with NN < 0.1 m. `verdict: 'poor'` ⇒ pipeline **refuses to diff** and surfaces actionable error ("scans could not be aligned — rescan with the marker visible") — never a silent bad report.

@@ -14,3 +14,13 @@ Append-only. Format per entry: `## <n> — <what>` / evidence / NEXT. A resuming
 Evidence: docs/ARCHITECTURE.md exists; task list #1–#10; LingBot recon report (session log).
 
 NEXT: implement src/core (types, vec3, mat4, svd3, kdtree) + tests.
+
+## 2 — Core + capture modules (2026-07-05)
+
+- src/core complete: types.ts (all pipeline shapes + ScanDiffError), vec3, mat4 (rigid ops, packed transform), svd3 (one-sided Jacobi; degenerate-column completion fixed after a failing rank-deficient test), kdtree (median-split, quickselect, iterative NN with pruning; verified against brute force).
+- src/capture complete: source.ts (CaptureSource seam), unproject.ts (pinhole, percentile confidence cull, projectPoint for report overlays), keyframes.ts (0.25 m / 15° / 30-frame forced gap), anchor.ts (QR corners+depth → 6-DOF marker pose, median fusion), mock.ts (ray-marched synthetic depth camera w/ deterministic noise), session.ts (ScanSessionBuilder), webxr.ts (untested-on-hardware ARCore path, actionable ScanDiffErrors), xr-ambient.d.ts (NB: must NOT be named webxr.d.ts — basename collision with webxr.ts makes tsc ignore it).
+- test/fixtures/synthetic.ts: enclosure (interior pan) + subject (exterior orbit) scenario builders — the two structurally different families for the genericness proof.
+
+Evidence: `npx vitest run` → 2 files, 30/30 passed; `npx tsc -p tsconfig.json` → exit 0. Commits 63da5ed, + capture commit.
+
+NEXT: src/align (umeyama.ts, coarse.ts, icp.ts, quality.ts) + tests (known-transform recovery, noise, partial overlap).
