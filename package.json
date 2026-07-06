@@ -1,19 +1,16 @@
 {
   "name": "scan-diff",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs",
-    "test": "test"
-  },
+  "version": "0.1.0",
+  "description": "Domain-agnostic two-session 3D scan comparison engine: scan, rescan, see what changed.",
+  "type": "module",
+  "license": "Apache-2.0",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "devDependencies": {
     "@types/node": "^26.1.0",
     "typescript": "^6.0.3",
