@@ -1,0 +1,33 @@
+- generic [ref=f1e2]:
+  - banner [ref=f1e168]:
+    - heading "Scan-Diff" [level=1] [ref=f1e169]
+  - main [ref=f1e170]:
+    - generic [ref=f1e171]:
+      - generic [ref=f1e172]: All scans stay on this device. Nothing is uploaded.
+      - heading "Scans" [level=2] [ref=f1e173]
+      - generic [ref=f1e174]:
+        - generic [ref=f1e175]:
+          - paragraph [ref=f1e176]: Demo rescan
+          - paragraph [ref=f1e177]: Jul 8, 2026, 9:26 AM · 166 k points · marker
+        - button "Delete scan Demo rescan" [ref=f1e178] [cursor=pointer]: Delete
+      - generic [ref=f1e179]:
+        - generic [ref=f1e180]:
+          - paragraph [ref=f1e181]: Demo baseline
+          - paragraph [ref=f1e182]: Jul 8, 2026, 9:25 AM · 166 k points · marker
+        - button "Delete scan Demo baseline" [ref=f1e183] [cursor=pointer]: Delete
+      - heading "Reports" [level=2] [ref=f1e184]
+      - generic [ref=f1e185] [cursor=pointer]:
+        - generic [ref=f1e186]:
+          - paragraph [ref=f1e187]: "Scan comparison: Demo baseline → Demo rescan"
+          - paragraph [ref=f1e188]: Jul 8, 2026, 9:27 AM
+        - button "Delete report" [ref=f1e189]: Delete
+  - navigation "Main" [ref=f1e190]:
+    - button "▧ Library" [ref=f1e191] [cursor=pointer]:
+      - generic [ref=f1e192]: ▧
+      - text: Library
+    - button "⊕ Scan" [ref=f1e193] [cursor=pointer]:
+      - generic [ref=f1e194]: ⊕
+      - text: Scan
+    - button "⇆ Compare" [ref=f1e195] [cursor=pointer]:
+      - generic [ref=f1e196]: ⇆
+      - text: Compare

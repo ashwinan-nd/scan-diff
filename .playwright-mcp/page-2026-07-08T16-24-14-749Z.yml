@@ -1,0 +1,81 @@
+- generic [ref=e2]:
+  - generic [ref=e5]:
+    - generic [ref=e6]: LUNAR LAUNCHER
+    - textbox "Search satellites..." [ref=e7]
+    - generic [ref=e8]:
+      - generic [ref=e9]: 2026-07-08 16:24:13 UTC
+      - generic [ref=e10]:
+        - button "EARTH" [ref=e11] [cursor=pointer]
+        - button "TRAJECTORY" [ref=e12] [cursor=pointer]
+        - button "MOON" [ref=e13] [cursor=pointer]
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16]: MISSION PARAMETERS
+      - button "◀" [ref=e17] [cursor=pointer]:
+        - generic [ref=e18]: ◀
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - generic [ref=e21]: Vehicle Specifications
+        - generic [ref=e22]:
+          - generic [ref=e23]:
+            - generic [ref=e24]: Rocket Name
+            - textbox "e.g., Falcon 9, SLS" [ref=e25]
+          - generic [ref=e26]:
+            - generic [ref=e27]: Total Mass (kg)
+            - spinbutton "549054" [ref=e28]
+          - generic [ref=e29]:
+            - generic [ref=e30]: Height (m)
+            - spinbutton "70" [ref=e31]
+          - generic [ref=e32]:
+            - generic [ref=e33]: Max Thrust (kN)
+            - spinbutton "7607" [ref=e34]
+          - generic [ref=e35]:
+            - generic [ref=e36]: Specific Impulse (s)
+            - spinbutton "311" [ref=e37]
+          - generic [ref=e38]:
+            - generic [ref=e39]: Payload Mass (kg)
+            - spinbutton "22800" [ref=e40]
+      - generic [ref=e41]:
+        - generic [ref=e42]: Launch Parameters
+        - generic [ref=e44]:
+          - generic [ref=e45]: Launch Site
+          - combobox [ref=e46]:
+            - option "Kennedy Space Center, FL (28.6°N, 80.6°W)" [selected]
+            - option "Baikonur Cosmodrome (46.0°N, 63.3°E)"
+            - option "Jiuquan Satellite Launch Center (41.0°N, 100.3°E)"
+            - option "Guiana Space Centre (5.2°N, 52.8°W)"
+            - option "Tanegashima Space Center (30.4°N, 131.0°E)"
+            - option "Satish Dhawan Space Centre (13.7°N, 80.2°E)"
+            - option "Custom"
+      - generic [ref=e47]:
+        - generic [ref=e48]: Launch Window
+        - generic [ref=e49]:
+          - generic [ref=e50]:
+            - generic [ref=e51]: Start Month
+            - textbox [ref=e52]: 2026-07
+          - generic [ref=e53]:
+            - generic [ref=e54]: End Month
+            - textbox [ref=e55]: 2026-08
+      - generic [ref=e56]:
+        - generic [ref=e57]: Mission Target
+        - generic [ref=e59]:
+          - generic [ref=e60]: Moon Target Region
+          - combobox [ref=e61]:
+            - option "Automatic (optimal landing site)" [selected]
+            - option "Mare Tranquillitatis (Apollo 11 site)"
+            - option "Oceanus Procellarum"
+            - option "Mare Imbrium"
+            - option "South Pole (Shackleton Crater)"
+            - option "Aristarchus Plateau"
+            - option "Tycho Crater"
+      - generic [ref=e62]:
+        - generic [ref=e63]: Quick Presets
+        - generic [ref=e64]:
+          - button "Apollo 11" [ref=e65] [cursor=pointer]
+          - button "Artemis III" [ref=e66] [cursor=pointer]
+          - button "Starship" [ref=e67] [cursor=pointer]
+      - button "LAUNCH" [ref=e68] [cursor=pointer]
+  - generic [ref=e71]:
+    - generic [ref=e72]: "Objects: 0"
+    - generic [ref=e73]: Jul 8, 2026, 09:24:14
+    - generic [ref=e74]: "Sources: CelesTrak + N2YO + SATCAT"
