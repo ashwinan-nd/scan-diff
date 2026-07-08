@@ -18,7 +18,10 @@ import {
   saveReport, saveScan, type ScanListEntry, type StoredReport,
 } from '../store/db';
 import { WebXRCaptureSource } from '../capture/webxr';
-import { UPLOAD_ACCEPT, isSupportedUpload, sessionFromPlyBuffer } from '../capture/upload';
+import { ScanSessionBuilder } from '../capture/session';
+import { transformPacked } from '../core/mat4';
+import { isSupportedUpload, sessionFromPlyBuffer } from '../capture/upload';
+import { EXCHANGE_EXTENSION, exportScan, importScan, isExchangeFile } from '../store/exchange';
 import { runDemoCapture } from './demo';
 import { PointCloudViewer } from './viewer';
 
@@ -93,11 +96,11 @@ async function scanScreen(): Promise<void> {
   ${xrOk
     ? '<div class="notice info">AR depth capture available. Place a printed QR code in the scene — the same code links this scan to future rescans.</div>'
     : ''}
-  <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Upload a point cloud file">
-    Drop a point-cloud file here, or tap to choose
-    <div class="hint">.ply from Polycam, Scaniverse, 3D Scanner App, or any LiDAR export</div>
+  <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Upload a scan file">
+    Drop a scan file here, or tap to choose
+    <div class="hint">.ply from Polycam, Scaniverse, 3D Scanner App — or a .scandiff exported from another device</div>
   </div>
-  <input type="file" id="file-input" accept="${UPLOAD_ACCEPT}" style="display:none" />
+  <input type="file" id="file-input" accept=".ply,${EXCHANGE_EXTENSION}" style="display:none" />
   <label for="scan-label">Scan name</label>
   <input type="text" id="scan-label" placeholder="e.g. baseline" value="" />
   <div class="row" style="flex-wrap:wrap">
@@ -132,11 +135,15 @@ async function scanScreen(): Promise<void> {
   const dropzone = document.getElementById('dropzone')!;
   async function handleFile(file: File): Promise<void> {
     try {
-      if (!isSupportedUpload(file.name)) {
-        throw new ScanDiffError('bad-input', `"${file.name}" is not a supported scan file (${UPLOAD_ACCEPT}).`);
-      }
       hudFrames.textContent = 'parsing…';
-      const session = sessionFromPlyBuffer(await file.arrayBuffer(), file.name);
+      let session: ScanSession;
+      if (isExchangeFile(file.name)) {
+        session = importScan(await file.text());
+      } else if (isSupportedUpload(file.name)) {
+        session = sessionFromPlyBuffer(await file.arrayBuffer(), file.name);
+      } else {
+        throw new ScanDiffError('bad-input', `"${file.name}" is not a supported scan file (.ply or ${EXCHANGE_EXTENSION}).`);
+      }
       showPending(session);
     } catch (e) {
       hudFrames.textContent = 'idle';
@@ -198,7 +205,6 @@ async function scanScreen(): Promise<void> {
     saveBtn.disabled = true;
     hudKf.style.display = '';
     hudPoints.classList.add('live');
-    const { ScanSessionBuilder } = await import('../capture/session');
     const source = new WebXRCaptureSource();
     const builder = new ScanSessionBuilder({ unproject: { stride: 4 } });
     const stopBtn = document.createElement('button');
@@ -371,7 +377,6 @@ async function reviewScreen(): Promise<void> {
   </div>
   <button class="btn primary block" id="open-report">Open report</button>
 </div>`;
-      const { transformPacked } = await import('../core/mat4');
       activeViewer = new PointCloudViewer(document.getElementById('cmp-viewer')!);
       const alignedB = transformPacked(res.transform, scanB.cloud.positions, scanB.cloud.count);
       activeViewer.setCompareClouds(scanA.cloud, { positions: alignedB, count: scanB.cloud.count });
@@ -406,7 +411,10 @@ async function libraryScreen(): Promise<void> {
     <p class="title">${esc(s.label)}</p>
     <p class="meta">${fmtDate(s.createdAt)} · ${fmtPoints(s.pointCount)} pts${s.hasAnchor ? ' · marker' : ''}</p>
   </div>
-  <button class="btn danger" data-del-scan="${esc(s.id)}" aria-label="Delete scan ${esc(s.label)}">Delete</button>
+  <div class="row">
+    <button class="btn quiet" data-export-scan="${esc(s.id)}" aria-label="Export scan ${esc(s.label)}">Export</button>
+    <button class="btn danger" data-del-scan="${esc(s.id)}" aria-label="Delete scan ${esc(s.label)}">Delete</button>
+  </div>
 </div>`,
         )
         .join('')
@@ -437,6 +445,23 @@ async function libraryScreen(): Promise<void> {
 </div>`, { tab: 'library' });
 
   const screen = document.getElementById('screen')!;
+  screen.querySelectorAll<HTMLElement>('[data-export-scan]').forEach((b) =>
+    b.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      try {
+        const scan = await getScan(b.dataset['exportScan']!);
+        if (!scan) throw new ScanDiffError('bad-input', 'Scan no longer exists.');
+        const blob = new Blob([await exportScan(scan)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${scan.label.replace(/[^a-z0-9- ]/gi, '') || 'scan'}${EXCHANGE_EXTENSION}`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch (e) {
+        toastError(e);
+      }
+    }),
+  );
   screen.querySelectorAll<HTMLElement>('[data-del-scan]').forEach((b) =>
     b.addEventListener('click', async (ev) => {
       ev.stopPropagation();
