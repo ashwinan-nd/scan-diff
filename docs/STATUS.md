@@ -1,4 +1,19 @@
-# Closing Status Report — updated 2026-07-08
+# Closing Status Report — updated 2026-07-08 (second pass)
+
+## Second pass (upload + UX overhaul), same day
+
+- **Real scan capability on every device**: .ply upload (drag/drop + picker)
+  parses LiDAR-app exports into first-class ScanSessions — 18 new tests
+  (parser edge cases, keyframe-less diff semantics, full pipeline on uploads).
+- **UI overhauled**: Scan→Review→Library nav (scan is the landing screen),
+  left rail ≥1024 px / bottom tabs below, fluid clamp() scale 320 px→ultrawide,
+  refined dark system (soft-depth shadows, mono data labels, dot-status pills,
+  stat tiles). Verified at 390/768/1440/1920 — docs/screenshots/v2-*.png.
+- **Detection strictness**: Standard 5 cm / Fine 2 cm segmented control,
+  calibrated by test (clean control + 6 cm object caught at Fine).
+- **Backend seam**: src/store/sync.ts SyncBackend contract + null default;
+  a server wires in via setSyncBackend() without touching pipeline/UI.
+- Suite: 102/102 across 10 files; tsc clean; zero app console errors.
 
 **Session continuation (2026-07-08):** PWA UI built and browser-verified.
 Everything below is verified against command output and screenshots, not
