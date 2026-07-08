@@ -70,3 +70,17 @@ NEXT (for resuming session): read ARCHITECTURE.md → this file → build src/st
 - Evidence: `npx vitest run` → 80/80 across 7 files; `npx tsc` exit 0; screenshots.
 
 NEXT: remaining list in docs/STATUS.md (real-device WebXR smoke, live QR detection loop in AR path, .scandiff export, production build audit).
+
+## 8 — Upload path + UI/UX overhaul + strictness (2026-07-08, second pass)
+
+- **PLY upload = real scan capability on every device**: src/capture/ply.ts (ASCII + binary LE/BE parser, list-property/face skipping, NaN-token sanitize vs corruption distinction, truncation guards), src/capture/upload.ts (session builder, 256 MB cap, extension filter). 13 parser tests + 5 upload tests.
+- **Keyframe-less sessions**: zero keyframes = complete imported cloud → diff layer bypasses frustum/occlusion gating instead of suppressing everything (occupancy-diff.ts). Tested end-to-end: two uploads through comparePipeline, yaw-search alignment, injected change found.
+- **UI overhaul**: nav reordered Scan→Review→Library (scan = default landing route). Fluid design system (clamp() type scale); ≥1024 px gets a left nav rail via CSS grid, <1024 px keeps bottom tabs; restrained soft-depth shadows, mono data labels, dot-indicator status pills, stat tiles, segmented control, dashed dropzone (patterns noted from awwwards research, implemented from scratch).
+- **Detection strictness**: Review screen Standard (5 cm) / Fine (2 cm) segmented control → voxelSizeM into the pipeline. Calibrated: fine stays clean on unchanged dense clouds, catches a 6 cm object, volume within 2× truth (test/strictness.test.ts, 4 tests).
+- **Sync contract**: src/store/sync.ts — SyncBackend interface + NullSyncBackend default; unit of sync = StoredScan/StoredReport; last-writer-wins; hard deletes; app never blocks on network. Backend plugs in via setSyncBackend() only.
+- Vocabulary sweep caught "Room-scale" in new UI copy → reworded (guardrail keeps working on new code).
+- Browser-verified via Playwright at 390/768/1440/1920: upload sample-before.ply + sample-after.ply → Review at Fine → exactly 1 added region, 6.8 mm RMSE, stat tiles + notice + viewer + report. Zero app console errors. Screenshots: docs/screenshots/v2-*.png. PLY fixtures: test/fixtures/sample-{before,after}.ply.
+
+Evidence: `npx vitest run` → 102/102 across 10 files; `npx tsc` exit 0; screenshots.
+
+NEXT: real-device ARCore smoke test + live QR loop remain the only hardware-gated items (docs/STATUS.md).

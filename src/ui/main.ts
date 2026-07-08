@@ -1,12 +1,12 @@
 /**
  * Scan-Diff PWA shell: hash router + four screens.
- *   #/          library (saved scans + reports, entry point)
- *   #/scan      capture (WebXR on ARCore devices, demo mode everywhere)
- *   #/compare   pick two scans, run the pipeline, view regions in 3D
+ *   #/scan        capture (default landing): WebXR AR, file upload, demo mode
+ *   #/review      pick two scans, run the pipeline, inspect regions in 3D
+ *   #/library     saved scans + reports
  *   #/report/:id  stored report viewer (iframe of the self-contained HTML)
  *
- * All pipeline work happens in this tab (no server). Long operations paint
- * progress before they start (pipeline runs are typically < 2 s at demo scale).
+ * Nav order mirrors the user journey: Scan first, Review second, Library last.
+ * All pipeline work happens in this tab (no server; local-first).
  */
 
 import './style.css';
@@ -18,6 +18,7 @@ import {
   saveReport, saveScan, type ScanListEntry, type StoredReport,
 } from '../store/db';
 import { WebXRCaptureSource } from '../capture/webxr';
+import { UPLOAD_ACCEPT, isSupportedUpload, sessionFromPlyBuffer } from '../capture/upload';
 import { runDemoCapture } from './demo';
 import { PointCloudViewer } from './viewer';
 
@@ -33,7 +34,7 @@ const fmtDate = (t: number): string =>
   new Date(t).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 const fmtPoints = (n: number): string =>
-  n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} M` : n >= 1000 ? `${Math.round(n / 1000)} k` : String(n);
+  n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
 
 function teardown(): void {
   if (activeViewer) {
@@ -42,7 +43,9 @@ function teardown(): void {
   }
 }
 
-function shell(title: string, body: string, opts: { back?: boolean; tab?: 'library' | 'scan' | 'compare' } = {}): void {
+type Tab = 'scan' | 'review' | 'library';
+
+function shell(title: string, body: string, opts: { back?: boolean; tab?: Tab } = {}): void {
   teardown();
   app.innerHTML = `
 <header class="topbar">
@@ -50,16 +53,16 @@ function shell(title: string, body: string, opts: { back?: boolean; tab?: 'libra
   <h1>${esc(title)}</h1>
   <span style="width:56px"></span>
 </header>
-<main class="screen" id="screen">${body}</main>
+<main class="screen"><div class="content" id="screen">${body}</div></main>
 <nav class="tabbar" aria-label="Main">
-  <button id="tab-library" class="${opts.tab === 'library' ? 'active' : ''}"><span class="glyph">&#9639;</span>Library</button>
   <button id="tab-scan" class="${opts.tab === 'scan' ? 'active' : ''}"><span class="glyph">&#8853;</span>Scan</button>
-  <button id="tab-compare" class="${opts.tab === 'compare' ? 'active' : ''}"><span class="glyph">&#8646;</span>Compare</button>
+  <button id="tab-review" class="${opts.tab === 'review' ? 'active' : ''}"><span class="glyph">&#8646;</span>Review</button>
+  <button id="tab-library" class="${opts.tab === 'library' ? 'active' : ''}"><span class="glyph">&#9639;</span>Library</button>
 </nav>`;
   document.getElementById('nav-back')?.addEventListener('click', () => history.back());
-  document.getElementById('tab-library')!.addEventListener('click', () => (location.hash = '#/'));
   document.getElementById('tab-scan')!.addEventListener('click', () => (location.hash = '#/scan'));
-  document.getElementById('tab-compare')!.addEventListener('click', () => (location.hash = '#/compare'));
+  document.getElementById('tab-review')!.addEventListener('click', () => (location.hash = '#/review'));
+  document.getElementById('tab-library')!.addEventListener('click', () => (location.hash = '#/library'));
 }
 
 function toastError(err: unknown): void {
@@ -71,6 +74,316 @@ function toastError(err: unknown): void {
   el.textContent = msg;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 6000);
+}
+
+/* ---------------- scan (default landing) ---------------- */
+
+async function scanScreen(): Promise<void> {
+  const xrOk = await WebXRCaptureSource.isSupported().catch(() => false);
+
+  shell('New scan', `
+<div class="stack">
+  <div class="viewer-wrap" id="viewer">
+    <div class="hud">
+      <span class="pill" id="hud-points">0 points</span>
+      <span class="pill" id="hud-frames">idle</span>
+      <span class="pill good" id="hud-kf" style="display:none">0 keyframes</span>
+    </div>
+  </div>
+  ${xrOk
+    ? '<div class="notice info">AR depth capture available. Place a printed QR code in the scene — the same code links this scan to future rescans.</div>'
+    : ''}
+  <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Upload a point cloud file">
+    Drop a point-cloud file here, or tap to choose
+    <div class="hint">.ply from Polycam, Scaniverse, 3D Scanner App, or any LiDAR export</div>
+  </div>
+  <input type="file" id="file-input" accept="${UPLOAD_ACCEPT}" style="display:none" />
+  <label for="scan-label">Scan name</label>
+  <input type="text" id="scan-label" placeholder="e.g. baseline" value="" />
+  <div class="row" style="flex-wrap:wrap">
+    ${xrOk ? '<button class="btn primary" id="start-xr" style="flex:1">Start AR scan</button>' : ''}
+    <button class="btn ${xrOk ? '' : 'primary'}" id="start-demo-a" style="flex:1">Demo: baseline</button>
+    <button class="btn" id="start-demo-b" style="flex:1">Demo: rescan</button>
+  </div>
+  <button class="btn block" id="save-scan" disabled>Save scan</button>
+  ${xrOk ? '' : '<p class="legend">No AR depth on this browser (needs Chrome on ARCore Android). Upload a scan file above, or run the demo — both use the identical pipeline.</p>'}
+</div>`, { tab: 'scan' });
+
+  const viewerEl = document.getElementById('viewer')!;
+  activeViewer = new PointCloudViewer(viewerEl);
+  const hudPoints = document.getElementById('hud-points')!;
+  const hudFrames = document.getElementById('hud-frames')!;
+  const hudKf = document.getElementById('hud-kf')!;
+  const saveBtn = document.getElementById('save-scan') as HTMLButtonElement;
+  const labelInput = document.getElementById('scan-label') as HTMLInputElement;
+  let pending: ScanSession | null = null;
+
+  function showPending(session: ScanSession): void {
+    pending = session;
+    hudPoints.textContent = `${fmtPoints(session.cloud.count)} points`;
+    hudFrames.textContent = 'ready';
+    activeViewer?.setCloud(session.cloud.positions, session.cloud.count);
+    if (!labelInput.value) labelInput.value = session.label;
+    saveBtn.disabled = false;
+  }
+
+  /* upload path */
+  const fileInput = document.getElementById('file-input') as HTMLInputElement;
+  const dropzone = document.getElementById('dropzone')!;
+  async function handleFile(file: File): Promise<void> {
+    try {
+      if (!isSupportedUpload(file.name)) {
+        throw new ScanDiffError('bad-input', `"${file.name}" is not a supported scan file (${UPLOAD_ACCEPT}).`);
+      }
+      hudFrames.textContent = 'parsing…';
+      const session = sessionFromPlyBuffer(await file.arrayBuffer(), file.name);
+      showPending(session);
+    } catch (e) {
+      hudFrames.textContent = 'idle';
+      toastError(e);
+    }
+  }
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') fileInput.click();
+  });
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files?.[0];
+    if (f) void handleFile(f);
+    fileInput.value = '';
+  });
+  for (const ev of ['dragover', 'dragenter'] as const) {
+    dropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+  }
+  for (const ev of ['dragleave', 'drop'] as const) {
+    dropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+    });
+  }
+  dropzone.addEventListener('drop', (e) => {
+    const f = (e as DragEvent).dataTransfer?.files?.[0];
+    if (f) void handleFile(f);
+  });
+
+  /* demo path */
+  async function runDemo(which: 'baseline' | 'rescan'): Promise<void> {
+    saveBtn.disabled = true;
+    hudKf.style.display = '';
+    hudPoints.classList.add('live');
+    try {
+      const session = await runDemoCapture(which, (p, positions, count) => {
+        hudPoints.textContent = `${fmtPoints(p.points)} points`;
+        hudFrames.textContent = `frame ${p.frame}/${p.totalFrames}`;
+        hudKf.textContent = `${p.keyframes} keyframes`;
+        activeViewer?.setCloud(positions, count);
+      });
+      hudFrames.textContent = 'done';
+      labelInput.value = session.label;
+      showPending(session);
+    } catch (e) {
+      toastError(e);
+    } finally {
+      hudPoints.classList.remove('live');
+    }
+  }
+  document.getElementById('start-demo-a')!.addEventListener('click', () => void runDemo('baseline'));
+  document.getElementById('start-demo-b')!.addEventListener('click', () => void runDemo('rescan'));
+
+  /* AR path */
+  document.getElementById('start-xr')?.addEventListener('click', async () => {
+    saveBtn.disabled = true;
+    hudKf.style.display = '';
+    hudPoints.classList.add('live');
+    const { ScanSessionBuilder } = await import('../capture/session');
+    const source = new WebXRCaptureSource();
+    const builder = new ScanSessionBuilder({ unproject: { stride: 4 } });
+    const stopBtn = document.createElement('button');
+    stopBtn.className = 'btn danger block';
+    stopBtn.textContent = 'Stop scanning';
+    document.getElementById('screen')!.appendChild(stopBtn);
+    stopBtn.addEventListener('click', () => void source.stop());
+    try {
+      let frame = 0;
+      for await (const f of source.start()) {
+        const r = builder.addFrame(f);
+        frame++;
+        hudPoints.textContent = `${fmtPoints(r.totalPoints)} points`;
+        hudFrames.textContent = `frame ${frame}`;
+        hudKf.textContent = `${builder.stats.keyframes} keyframes`;
+      }
+      showPending(builder.build(`scan-${Date.now()}`, labelInput.value || 'untitled', navigator.userAgent));
+    } catch (e) {
+      toastError(e);
+    } finally {
+      stopBtn.remove();
+      hudPoints.classList.remove('live');
+    }
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    if (!pending) return;
+    pending.label = labelInput.value.trim() || pending.label;
+    try {
+      await saveScan(pending);
+      location.hash = '#/library';
+    } catch (e) {
+      toastError(e);
+    }
+  });
+}
+
+/* ---------------- review (compare) ---------------- */
+
+type Strictness = 'standard' | 'fine';
+const STRICTNESS_OPTS: Record<Strictness, { voxelSizeM: number; label: string; blurb: string }> = {
+  standard: { voxelSizeM: 0.05, label: 'Standard · 5 cm', blurb: 'Everyday changes; tolerant of scan noise.' },
+  fine: { voxelSizeM: 0.02, label: 'Fine · 2 cm', blurb: 'Strictest detection; needs dense, careful scans.' },
+};
+
+async function reviewScreen(): Promise<void> {
+  let scans: ScanListEntry[] = [];
+  try {
+    scans = await listScans();
+  } catch (e) {
+    toastError(e);
+  }
+
+  if (scans.length < 2) {
+    shell('Review changes', `
+<div class="empty-state">
+  <div class="icon">&#8646;</div>
+  Two saved scans are needed to review changes.<br>
+  ${scans.length === 0 ? 'Capture or upload a baseline first.' : 'Capture or upload a rescan of the same thing.'}
+</div>
+<button class="btn primary block" id="go-scan">Go scan</button>`, { back: false, tab: 'review' });
+    document.getElementById('go-scan')!.addEventListener('click', () => (location.hash = '#/scan'));
+    return;
+  }
+
+  const pick = (slot: string): string =>
+    scans
+      .map(
+        (s) => `
+<div class="card tappable" data-pick="${slot}:${esc(s.id)}">
+  <p class="title">${esc(s.label)}</p>
+  <p class="meta">${fmtDate(s.createdAt)} · ${fmtPoints(s.pointCount)} pts${s.hasAnchor ? ' · marker' : ''}</p>
+</div>`,
+      )
+      .join('');
+
+  shell('Review changes', `
+<div class="stack">
+  <div class="grid-2">
+    <div class="stack">
+      <h2 class="section-label">1 · Before (baseline)</h2>
+      <div id="pick-a" class="stack">${pick('a')}</div>
+    </div>
+    <div class="stack">
+      <h2 class="section-label">2 · After (rescan)</h2>
+      <div id="pick-b" class="stack">${pick('b')}</div>
+    </div>
+  </div>
+  <h2 class="section-label">Detection strictness</h2>
+  <div class="segmented" id="strictness" role="radiogroup" aria-label="Detection strictness">
+    <button data-strict="standard" class="active" role="radio" aria-checked="true">${STRICTNESS_OPTS.standard.label}</button>
+    <button data-strict="fine" role="radio" aria-checked="false">${STRICTNESS_OPTS.fine.label}</button>
+  </div>
+  <p class="legend" id="strictness-blurb">${STRICTNESS_OPTS.standard.blurb}</p>
+  <button class="btn primary block" id="run-compare" disabled>Review changes</button>
+  <div id="compare-result"></div>
+</div>`, { tab: 'review' });
+
+  const sel: { a: string | null; b: string | null } = { a: null, b: null };
+  let strict: Strictness = 'standard';
+  const runBtn = document.getElementById('run-compare') as HTMLButtonElement;
+
+  document.querySelectorAll<HTMLElement>('#strictness button').forEach((b) =>
+    b.addEventListener('click', () => {
+      strict = b.dataset['strict'] as Strictness;
+      document.querySelectorAll('#strictness button').forEach((x) => {
+        x.classList.toggle('active', x === b);
+        x.setAttribute('aria-checked', x === b ? 'true' : 'false');
+      });
+      document.getElementById('strictness-blurb')!.textContent = STRICTNESS_OPTS[strict].blurb;
+    }),
+  );
+
+  document.querySelectorAll<HTMLElement>('[data-pick]').forEach((card) =>
+    card.addEventListener('click', () => {
+      const [slot, id] = card.dataset['pick']!.split(':') as ['a' | 'b', string];
+      sel[slot] = id;
+      card.parentElement!.querySelectorAll('.card').forEach((c) => c.classList.remove('selected'));
+      card.classList.add('selected');
+      runBtn.disabled = !(sel.a && sel.b && sel.a !== sel.b);
+    }),
+  );
+
+  runBtn.addEventListener('click', async () => {
+    runBtn.disabled = true;
+    runBtn.textContent = 'Aligning + diffing…';
+    try {
+      const [scanA, scanB] = await Promise.all([getScan(sel.a!), getScan(sel.b!)]);
+      if (!scanA || !scanB) throw new ScanDiffError('bad-input', 'A selected scan no longer exists.');
+      await new Promise((r) => requestAnimationFrame(r));
+      const res = comparePipeline(scanA, scanB, {
+        diff: { voxelSizeM: STRICTNESS_OPTS[strict].voxelSizeM },
+      });
+      const html = renderReportHtml(res.report, { scanA: new Map(), scanB: new Map() });
+      const reportId = `report-${Date.now()}`;
+      await saveReport({
+        id: reportId,
+        title: res.report.title,
+        createdAt: Date.now(),
+        scanAId: scanA.id,
+        scanBId: scanB.id,
+        html,
+      });
+
+      const counts = { added: 0, removed: 0, shifted: 0 };
+      for (const r of res.diff.regions) counts[r.kind]++;
+      const resultEl = document.getElementById('compare-result')!;
+      resultEl.innerHTML = `
+<div class="stack" style="margin-top:14px">
+  <div class="stats">
+    <div class="stat"><div class="v">${res.diff.regions.length}</div><div class="k">regions</div></div>
+    <div class="stat"><div class="v" style="color:var(--good)">${counts.added}</div><div class="k">added</div></div>
+    <div class="stat"><div class="v" style="color:var(--bad)">${counts.removed}</div><div class="k">removed</div></div>
+    <div class="stat"><div class="v" style="color:var(--warn)">${counts.shifted}</div><div class="k">moved</div></div>
+    <div class="stat"><div class="v">${(res.quality.rmse * 1000).toFixed(1)}<span style="font-size:0.5em"> mm</span></div><div class="k">align RMSE</div></div>
+  </div>
+  <div class="notice ${res.diff.regions.length ? 'warn' : 'info'}">
+    ${res.diff.regions.length
+      ? `Changes detected at ${esc(STRICTNESS_OPTS[strict].label)} — inspect below, then open the report.`
+      : 'No geometric changes at this detection resolution.'}
+    Alignment ${esc(res.quality.verdict)} via ${esc(res.alignmentMethod)}.
+  </div>
+  <div class="viewer-wrap" id="cmp-viewer"></div>
+  <div class="legend">
+    <span><span style="color:var(--accent)">&#9679;</span> before</span>
+    <span><span style="color:#33d17a">&#9679;</span> after (aligned)</span>
+    <span class="badge added">added</span>
+    <span class="badge removed">removed</span>
+    <span class="badge shifted">moved</span>
+  </div>
+  <button class="btn primary block" id="open-report">Open report</button>
+</div>`;
+      const { transformPacked } = await import('../core/mat4');
+      activeViewer = new PointCloudViewer(document.getElementById('cmp-viewer')!);
+      const alignedB = transformPacked(res.transform, scanB.cloud.positions, scanB.cloud.count);
+      activeViewer.setCompareClouds(scanA.cloud, { positions: alignedB, count: scanB.cloud.count });
+      activeViewer.addRegionBoxes(res.diff.regions);
+      document.getElementById('open-report')!.addEventListener('click', () => (location.hash = `#/report/${reportId}`));
+    } catch (e) {
+      toastError(e);
+    } finally {
+      runBtn.textContent = 'Review changes';
+      runBtn.disabled = false;
+    }
+  });
 }
 
 /* ---------------- library ---------------- */
@@ -91,13 +404,13 @@ async function libraryScreen(): Promise<void> {
 <div class="card row between" data-scan="${esc(s.id)}">
   <div>
     <p class="title">${esc(s.label)}</p>
-    <p class="meta">${fmtDate(s.createdAt)} · ${fmtPoints(s.pointCount)} points${s.hasAnchor ? ' · marker' : ''}</p>
+    <p class="meta">${fmtDate(s.createdAt)} · ${fmtPoints(s.pointCount)} pts${s.hasAnchor ? ' · marker' : ''}</p>
   </div>
   <button class="btn danger" data-del-scan="${esc(s.id)}" aria-label="Delete scan ${esc(s.label)}">Delete</button>
 </div>`,
         )
         .join('')
-    : `<div class="empty-state"><div class="icon">&#9639;</div>No scans yet.<br>Scan something, then scan it again later to see what changed.</div>`;
+    : `<div class="empty-state"><div class="icon">&#9639;</div>No scans yet.<br>Scan or upload something, then do it again later to see what changed.</div>`;
 
   const reportsHtml = reports.length
     ? reports
@@ -112,14 +425,14 @@ async function libraryScreen(): Promise<void> {
 </div>`,
         )
         .join('')
-    : `<p class="meta" style="color:var(--text-dim)">No reports yet — compare two scans to generate one.</p>`;
+    : `<p class="legend">No reports yet — review two scans to generate one.</p>`;
 
-  shell('Scan-Diff', `
+  shell('Library', `
 <div class="stack">
-  <div class="notice info">All scans stay on this device. Nothing is uploaded.</div>
-  <h2 style="font-size:14px;color:var(--text-dim);margin:8px 0 0;text-transform:uppercase;letter-spacing:0.5px">Scans</h2>
+  <div class="notice info">All scans stay on this device. Nothing is uploaded to any server.</div>
+  <h2 class="section-label">Scans</h2>
   ${scansHtml}
-  <h2 style="font-size:14px;color:var(--text-dim);margin:14px 0 0;text-transform:uppercase;letter-spacing:0.5px">Reports</h2>
+  <h2 class="section-label">Reports</h2>
   ${reportsHtml}
 </div>`, { tab: 'library' });
 
@@ -141,214 +454,6 @@ async function libraryScreen(): Promise<void> {
   screen.querySelectorAll<HTMLElement>('[data-report]').forEach((c) =>
     c.addEventListener('click', () => (location.hash = `#/report/${c.dataset['report']!}`)),
   );
-}
-
-/* ---------------- scan ---------------- */
-
-async function scanScreen(): Promise<void> {
-  const xrOk = await WebXRCaptureSource.isSupported().catch(() => false);
-
-  shell('New scan', `
-<div class="stack">
-  <div class="viewer-wrap" id="viewer">
-    <div class="hud">
-      <span class="pill" id="hud-points">0 points</span>
-      <span class="pill" id="hud-frames">idle</span>
-      <span class="pill good" id="hud-kf" style="display:none">0 keyframes</span>
-    </div>
-  </div>
-  ${xrOk
-    ? '<div class="notice info">AR depth capture available. Place a printed QR code in the scene — the same code links this scan to future rescans.</div>'
-    : '<div class="notice warn">This browser has no WebXR depth sensing (Chrome on an ARCore-capable Android device required). Demo mode below exercises the identical pipeline with synthetic depth.</div>'}
-  <label for="scan-label" style="font-size:13px;color:var(--text-dim)">Scan name</label>
-  <input type="text" id="scan-label" placeholder="e.g. baseline" value="" />
-  <div class="row">
-    ${xrOk ? '<button class="btn primary block" id="start-xr">Start AR scan</button>' : ''}
-    <button class="btn ${xrOk ? '' : 'primary'} block" id="start-demo-a">Demo: baseline</button>
-    <button class="btn block" id="start-demo-b">Demo: rescan</button>
-  </div>
-  <button class="btn block" id="save-scan" disabled>Save scan</button>
-</div>`, { back: true, tab: 'scan' });
-
-  const viewerEl = document.getElementById('viewer')!;
-  activeViewer = new PointCloudViewer(viewerEl);
-  const hudPoints = document.getElementById('hud-points')!;
-  const hudFrames = document.getElementById('hud-frames')!;
-  const hudKf = document.getElementById('hud-kf')!;
-  const saveBtn = document.getElementById('save-scan') as HTMLButtonElement;
-  const labelInput = document.getElementById('scan-label') as HTMLInputElement;
-  let pending: ScanSession | null = null;
-
-  async function runDemo(which: 'baseline' | 'rescan'): Promise<void> {
-    saveBtn.disabled = true;
-    hudKf.style.display = '';
-    try {
-      pending = await runDemoCapture(which, (p, positions, count) => {
-        hudPoints.textContent = `${fmtPoints(p.points)} points`;
-        hudFrames.textContent = `frame ${p.frame}/${p.totalFrames}`;
-        hudKf.textContent = `${p.keyframes} keyframes`;
-        activeViewer?.setCloud(positions, count);
-      });
-      hudFrames.textContent = 'done';
-      if (!labelInput.value) labelInput.value = pending.label;
-      saveBtn.disabled = false;
-    } catch (e) {
-      toastError(e);
-    }
-  }
-
-  document.getElementById('start-demo-a')!.addEventListener('click', () => void runDemo('baseline'));
-  document.getElementById('start-demo-b')!.addEventListener('click', () => void runDemo('rescan'));
-
-  document.getElementById('start-xr')?.addEventListener('click', async () => {
-    // real AR capture: identical builder path, frames from the sensor
-    saveBtn.disabled = true;
-    hudKf.style.display = '';
-    const { ScanSessionBuilder } = await import('../capture/session');
-    const source = new WebXRCaptureSource();
-    const builder = new ScanSessionBuilder({ unproject: { stride: 4 } });
-    const stopBtn = document.createElement('button');
-    stopBtn.className = 'btn danger block';
-    stopBtn.textContent = 'Stop scanning';
-    document.getElementById('screen')!.appendChild(stopBtn);
-    stopBtn.addEventListener('click', () => void source.stop());
-    try {
-      let frame = 0;
-      for await (const f of source.start()) {
-        const r = builder.addFrame(f);
-        frame++;
-        hudPoints.textContent = `${fmtPoints(r.totalPoints)} points`;
-        hudFrames.textContent = `frame ${frame}`;
-        hudKf.textContent = `${builder.stats.keyframes} keyframes`;
-      }
-      pending = builder.build(`scan-${Date.now()}`, labelInput.value || 'untitled', navigator.userAgent);
-      saveBtn.disabled = false;
-    } catch (e) {
-      toastError(e);
-    } finally {
-      stopBtn.remove();
-    }
-  });
-
-  saveBtn.addEventListener('click', async () => {
-    if (!pending) return;
-    pending.label = labelInput.value.trim() || pending.label;
-    try {
-      await saveScan(pending);
-      location.hash = '#/';
-    } catch (e) {
-      toastError(e);
-    }
-  });
-}
-
-/* ---------------- compare ---------------- */
-
-async function compareScreen(): Promise<void> {
-  let scans: ScanListEntry[] = [];
-  try {
-    scans = await listScans();
-  } catch (e) {
-    toastError(e);
-  }
-
-  if (scans.length < 2) {
-    shell('Compare', `
-<div class="empty-state">
-  <div class="icon">&#8646;</div>
-  Need at least two saved scans to compare.<br>
-  ${scans.length === 0 ? 'Capture a baseline first.' : 'Capture a rescan of the same thing.'}
-</div>
-<button class="btn primary block" id="go-scan">Go scan</button>`, { back: true, tab: 'compare' });
-    document.getElementById('go-scan')!.addEventListener('click', () => (location.hash = '#/scan'));
-    return;
-  }
-
-  const pick = (slot: string): string =>
-    scans
-      .map(
-        (s) => `
-<div class="card tappable" data-pick="${slot}:${esc(s.id)}">
-  <p class="title">${esc(s.label)}</p>
-  <p class="meta">${fmtDate(s.createdAt)} · ${fmtPoints(s.pointCount)} points${s.hasAnchor ? ' · marker' : ''}</p>
-</div>`,
-      )
-      .join('');
-
-  shell('Compare', `
-<div class="stack">
-  <h2 style="font-size:14px;color:var(--text-dim);margin:0;text-transform:uppercase;letter-spacing:0.5px">1 · Before (baseline)</h2>
-  <div id="pick-a">${pick('a')}</div>
-  <h2 style="font-size:14px;color:var(--text-dim);margin:10px 0 0;text-transform:uppercase;letter-spacing:0.5px">2 · After (rescan)</h2>
-  <div id="pick-b">${pick('b')}</div>
-  <button class="btn primary block" id="run-compare" disabled>Compare scans</button>
-  <div id="compare-result"></div>
-</div>`, { back: true, tab: 'compare' });
-
-  const sel: { a: string | null; b: string | null } = { a: null, b: null };
-  const runBtn = document.getElementById('run-compare') as HTMLButtonElement;
-  document.querySelectorAll<HTMLElement>('[data-pick]').forEach((card) =>
-    card.addEventListener('click', () => {
-      const [slot, id] = card.dataset['pick']!.split(':') as ['a' | 'b', string];
-      sel[slot] = id;
-      card.parentElement!.querySelectorAll('.card').forEach((c) => c.classList.remove('selected'));
-      card.classList.add('selected');
-      runBtn.disabled = !(sel.a && sel.b && sel.a !== sel.b);
-    }),
-  );
-
-  runBtn.addEventListener('click', async () => {
-    runBtn.disabled = true;
-    runBtn.textContent = 'Aligning + diffing…';
-    try {
-      const [scanA, scanB] = await Promise.all([getScan(sel.a!), getScan(sel.b!)]);
-      if (!scanA || !scanB) throw new ScanDiffError('bad-input', 'A selected scan no longer exists.');
-      // pipeline is synchronous CPU work; yield a frame so the button label paints
-      await new Promise((r) => requestAnimationFrame(r));
-      const res = comparePipeline(scanA, scanB);
-      const html = renderReportHtml(res.report, { scanA: new Map(), scanB: new Map() });
-      const reportId = `report-${Date.now()}`;
-      await saveReport({
-        id: reportId,
-        title: res.report.title,
-        createdAt: Date.now(),
-        scanAId: scanA.id,
-        scanBId: scanB.id,
-        html,
-      });
-
-      const resultEl = document.getElementById('compare-result')!;
-      resultEl.innerHTML = `
-<div class="stack" style="margin-top:12px">
-  <div class="notice ${res.diff.regions.length ? 'warn' : 'info'}">
-    ${res.diff.regions.length
-      ? `${res.diff.regions.length} changed region${res.diff.regions.length > 1 ? 's' : ''} found — boxes shown below.`
-      : 'No geometric changes at detection resolution.'}
-    Alignment ${esc(res.quality.verdict)} (RMSE ${(res.quality.rmse * 1000).toFixed(1)} mm, ${esc(res.alignmentMethod)}).
-  </div>
-  <div class="viewer-wrap" id="cmp-viewer"></div>
-  <div class="row" style="font-size:12px;color:var(--text-dim);gap:14px">
-    <span><span style="color:var(--accent)">&#9679;</span> before</span>
-    <span><span style="color:#33d17a">&#9679;</span> after (aligned)</span>
-    <span><span class="badge added">added</span></span>
-    <span><span class="badge removed">removed</span></span>
-    <span><span class="badge shifted">moved</span></span>
-  </div>
-  <button class="btn primary block" id="open-report">Open report</button>
-</div>`;
-      const { transformPacked } = await import('../core/mat4');
-      activeViewer = new PointCloudViewer(document.getElementById('cmp-viewer')!);
-      const alignedB = transformPacked(res.transform, scanB.cloud.positions, scanB.cloud.count);
-      activeViewer.setCompareClouds(scanA.cloud, { positions: alignedB, count: scanB.cloud.count });
-      activeViewer.addRegionBoxes(res.diff.regions);
-      document.getElementById('open-report')!.addEventListener('click', () => (location.hash = `#/report/${reportId}`));
-    } catch (e) {
-      toastError(e);
-    } finally {
-      runBtn.textContent = 'Compare scans';
-      runBtn.disabled = false;
-    }
-  });
 }
 
 /* ---------------- report viewer ---------------- */
@@ -391,11 +496,11 @@ async function reportScreen(id: string): Promise<void> {
 /* ---------------- router ---------------- */
 
 function route(): void {
-  const hash = location.hash || '#/';
+  const hash = location.hash || '#/scan';
   if (hash.startsWith('#/report/')) void reportScreen(hash.slice('#/report/'.length));
-  else if (hash === '#/scan') void scanScreen();
-  else if (hash === '#/compare') void compareScreen();
-  else void libraryScreen();
+  else if (hash === '#/review' || hash === '#/compare') void reviewScreen();
+  else if (hash === '#/library' || hash === '#/') void libraryScreen();
+  else void scanScreen();
 }
 
 window.addEventListener('hashchange', route);
