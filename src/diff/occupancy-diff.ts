@@ -126,6 +126,13 @@ export function diffOccupancy(
   const camsA = camPos(keyframesA);
   const camsB = camPos(keyframesB);
 
+  // A session with zero keyframes is an imported/complete cloud (file upload),
+  // not a partial sweep — there are no frusta to gate on, and suppressing
+  // every candidate as "unobserved" would silently produce an empty report.
+  // Treat such a session as having observed everything.
+  const aObservesAll = keyframesA.length === 0;
+  const bObservesAll = keyframesB.length === 0;
+
   const removedKeys: number[] = [];
   let aObservedByB = 0;
   let aOcc = 0;
@@ -138,7 +145,7 @@ export function diffOccupancy(
     }
     // "removed" needs B to have genuinely seen the empty space — occlusion
     // checked against B's OWN geometry
-    if (observed(center(k), fsB, camsB, gridB, opts.observationRangeM)) {
+    if (bObservesAll || observed(center(k), fsB, camsB, gridB, opts.observationRangeM)) {
       aObservedByB++;
       removedKeys.push(k);
     }
@@ -156,7 +163,7 @@ export function diffOccupancy(
       continue;
     }
     // "added" needs A to have seen that space empty — occlusion vs A's geometry
-    if (observed(center(k), fsA, camsA, gridA, opts.observationRangeM)) {
+    if (aObservesAll || observed(center(k), fsA, camsA, gridA, opts.observationRangeM)) {
       bObservedByA++;
       addedKeys.push(k);
     }
