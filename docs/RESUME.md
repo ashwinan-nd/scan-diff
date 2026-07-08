@@ -84,3 +84,12 @@ NEXT: remaining list in docs/STATUS.md (real-device WebXR smoke, live QR detecti
 Evidence: `npx vitest run` → 102/102 across 10 files; `npx tsc` exit 0; screenshots.
 
 NEXT: real-device ARCore smoke test + live QR loop remain the only hardware-gated items (docs/STATUS.md).
+
+## 9 — Completeness closure (2026-07-08, third pass)
+
+- .scandiff exchange: store/exchange.ts + Library Export buttons + dropzone import (.ply and .scandiff share one handler, routed by extension). Cross-device scan portability without any backend.
+- QR anchor adapter: capture/qr.ts (injectable detector seam over jsQR, RGB↔depth coordinate mapping w/ median filter). Everything short of the live camera feed is built and tested; the feed itself needs WebXR camera-access on hardware.
+- Production build: warnings fixed (dynamic-import cleanup), dist served + smoke-tested in browser (demo capture → save → Library w/ Export). README + STATUS refreshed to final state.
+- Evidence: 109/109 tests across 11 files; tsc clean; `npm run build` clean; prod smoke via Playwright.
+
+NEXT (hardware only): ARCore device smoke test; wire live RGB frames (WebXR camera-access) into detectAnchorInFrame + keyframe photos.

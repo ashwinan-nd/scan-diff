@@ -51,12 +51,28 @@ npm run typecheck
 `docs/ARCHITECTURE.md` — every design decision, algorithms to implementation
 precision. `docs/RESUME.md` — build state log (read this first when resuming).
 
+## Capturing a scan
+
+Three paths, one pipeline:
+
+1. **AR capture** — Chrome on an ARCore-capable Android device: live WebXR
+   depth, walk around the subject, keep the printed QR code in view.
+2. **File upload** — export a point cloud (`.ply`) from any LiDAR scanning
+   app (Polycam, Scaniverse, 3D Scanner App) and drop it on the Scan screen.
+   Works on every device, including iOS.
+3. **`.scandiff` exchange** — export any saved scan from the Library as a
+   single portable file and import it on another device.
+
+Review offers two detection strictness levels: Standard (5 cm voxels) and
+Fine (2 cm, for dense careful scans).
+
 ## Status
 
-Core pipeline (capture math, alignment, diff, report, comparePipeline facade)
-is built and tested end-to-end against two structurally different synthetic
-scenario families. Browser UI, IndexedDB store wiring, and real-device WebXR
-validation are the remaining work — see docs/STATUS.md.
+Full pipeline + PWA UI built, tested (109 automated tests), and
+browser-verified from 320 px phones to 1920 px desktops, including the
+production bundle. The only hardware-gated remainder is a live smoke test on
+an ARCore device (the WebXR path is written to spec and feature-detected).
+See docs/STATUS.md for the precise ledger.
 
 ## License
 

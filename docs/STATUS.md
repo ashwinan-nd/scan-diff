@@ -61,13 +61,31 @@ pipeline).
 5. Grazing-angle sampling ghosts (conf ≤0.37 vs genuine ≥0.51) → region confidence floor 0.45.
 6. Rectangular-room 180° yaw ambiguity confirmed for markerless fallback → validates marker-primary design (documented limitation).
 
-## Remaining (in dependency order for resumption)
+## Third pass (2026-07-08, completeness closure)
 
-1. WebXR real-device smoke test (needs ARCore hardware + HTTPS; `webxr.ts` written to spec, typed, feature-detected — but never run on hardware).
-2. Live QR anchor detection during AR capture (jsQR wired as a dependency; anchor math tested; the RGB-frame detection loop in the AR path is not yet written — demo mode simulates the anchor).
-3. `.scandiff` export/import envelope (codec done; file wrapper not).
-4. Report photo pipeline on real captures (mock sessions have no RGB; geometry evidence cards already render in reports).
-5. `vite build` production-bundle check + PWA install audit (dev-server verified; production build not exercised).
+- **`.scandiff` exchange shipped**: src/store/exchange.ts (versioned JSON
+  envelope, base64 binary payloads, corruption guards re-validated through
+  the codec), Export button per scan in Library, import via the Scan
+  dropzone/file picker alongside .ply. 4 tests.
+- **QR anchor detection adapter shipped**: src/capture/qr.ts — jsQR-backed
+  detector behind an injectable seam, RGB→depth-buffer coordinate mapping
+  with 3×3 median depth sampling, full geometry path unit-tested (3 tests).
+  The remaining hookup is feeding it live RGB frames, which requires the
+  WebXR camera-access feature on real hardware.
+- **Production build audited**: `npm run build` clean (115 ms, 158 kB gzip);
+  ineffective dynamic imports removed; dist served and smoke-tested in a
+  real browser (demo capture → save → Library with Export, IndexedDB intact).
+- Suite: 109/109 across 11 files; tsc clean.
+
+## Remaining (hardware-gated only)
+
+1. WebXR real-device smoke test (needs ARCore hardware + HTTPS; `webxr.ts`
+   written to spec, typed, feature-detected — never run on hardware).
+2. Live RGB frame feed for QR detection during AR capture (adapter complete
+   and tested; needs WebXR `camera-access` on real hardware). Until then the
+   marker path works via uploads/exchange, and demo mode simulates it.
+3. Report photo pipeline on real captures (geometry evidence cards already
+   render; photos need the same camera-access feed).
 
 ## Deliverable checklist vs definition of done
 
