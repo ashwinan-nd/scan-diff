@@ -1,0 +1,24 @@
+- generic [ref=f1e2]:
+  - banner [ref=f1e41]:
+    - heading "Scan-Diff" [level=1] [ref=f1e42]
+  - main [ref=f1e43]:
+    - generic [ref=f1e44]:
+      - generic [ref=f1e45]: All scans stay on this device. Nothing is uploaded.
+      - heading "Scans" [level=2] [ref=f1e46]
+      - generic [ref=f1e47]:
+        - generic [ref=f1e48]:
+          - paragraph [ref=f1e49]: Demo baseline
+          - paragraph [ref=f1e50]: Jul 8, 2026, 9:25 AM · 166 k points · marker
+        - button "Delete scan Demo baseline" [ref=f1e51] [cursor=pointer]: Delete
+      - heading "Reports" [level=2] [ref=f1e52]
+      - paragraph [ref=f1e53]: No reports yet — compare two scans to generate one.
+  - navigation "Main" [ref=f1e54]:
+    - button "▧ Library" [ref=f1e55] [cursor=pointer]:
+      - generic [ref=f1e56]: ▧
+      - text: Library
+    - button "⊕ Scan" [ref=f1e57] [cursor=pointer]:
+      - generic [ref=f1e58]: ⊕
+      - text: Scan
+    - button "⇆ Compare" [ref=f1e59] [cursor=pointer]:
+      - generic [ref=f1e60]: ⇆
+      - text: Compare

@@ -1,0 +1,17 @@
+{
+  "name": "Scan-Diff",
+  "short_name": "Scan-Diff",
+  "description": "Scan something. Scan it again later. See exactly what changed.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b0e13",
+  "theme_color": "#0b0e13",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230b0e13'/%3E%3Cpath d='M25 60 L50 30 L75 60' stroke='%234da3ff' stroke-width='8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M25 75 L50 45 L75 75' stroke='%2333d17a' stroke-width='8' fill='none' stroke-linecap='round' stroke-linejoin='round' opacity='0.7'/%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

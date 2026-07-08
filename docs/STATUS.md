@@ -1,7 +1,28 @@
-# Closing Status Report — session ending 2026-07-06
+# Closing Status Report — updated 2026-07-08
 
-**Why stopped:** weekly usage limit (97% when the wrap order arrived), not
-completion. Everything below is verified against command output, not asserted.
+**Session continuation (2026-07-08):** PWA UI built and browser-verified.
+Everything below is verified against command output and screenshots, not
+asserted.
+
+## UI layer (new since 2026-07-06)
+
+Built: `src/ui/` (main.ts router + library/scan/compare/report screens,
+viewer.ts three.js decimated point renderer, demo.ts synthetic capture through
+the real CaptureSource seam, style.css), `src/store/db.ts` (IndexedDB),
+index.html, vite.config.ts, public/manifest.webmanifest, public/sw.js.
+
+Verified in a real browser (Playwright, zero console errors), evidence in
+docs/screenshots/:
+- library-mobile.png / library-desktop.png — library at 390 px and 1280 px
+- scan-live-mobile.png — live scan with 166 k points accumulating, HUD frame/keyframe counters
+- compare-mobile.png — scan pickers, pipeline run in-tab: "4 changed regions found… Alignment good (RMSE 8.3 mm, marker)"
+- report-mobile.png — stored report rendered in-app: "4 changed regions detected: 1 addition, 1 removal, 1 moved object (2 linked regions)" — exactly the injected demo changes
+
+Full user workflow executed end-to-end by clicking through the UI:
+scan → save → rescan → save → compare → open report. IndexedDB persistence
+confirmed across navigations. WebXR capture path wired for ARCore devices
+(feature-detected; demo mode everywhere else exercises the identical
+pipeline).
 
 ## Built and proven (76/76 tests passing, `tsc` clean)
 
@@ -25,14 +46,13 @@ completion. Everything below is verified against command output, not asserted.
 5. Grazing-angle sampling ghosts (conf ≤0.37 vs genuine ≥0.51) → region confidence floor 0.45.
 6. Rectangular-room 180° yaw ambiguity confirmed for markerless fallback → validates marker-primary design (documented limitation).
 
-## Stubbed / not built (in dependency order for resumption)
+## Remaining (in dependency order for resumption)
 
-1. `src/store/db.ts` — IndexedDB wrapper (2 object stores). codec.ts done+committed, untested.
-2. `test/store.test.ts` — codec round-trip (Node: Blob available since 18).
-3. PWA UI (`src/ui/`, index.html, vite.config.ts, manifest, SW): scan screen w/ live decimated point view (three.js), library, compare flow, report view. Design constraints in ARCHITECTURE §3, §4.
-4. WebXR real-device smoke test (needs ARCore hardware + HTTPS).
-5. `.scandiff` export/import envelope.
-6. Report photo pipeline on real captures (mock sessions have no RGB; geometry evidence cards already render).
+1. WebXR real-device smoke test (needs ARCore hardware + HTTPS; `webxr.ts` written to spec, typed, feature-detected — but never run on hardware).
+2. Live QR anchor detection during AR capture (jsQR wired as a dependency; anchor math tested; the RGB-frame detection loop in the AR path is not yet written — demo mode simulates the anchor).
+3. `.scandiff` export/import envelope (codec done; file wrapper not).
+4. Report photo pipeline on real captures (mock sessions have no RGB; geometry evidence cards already render in reports).
+5. `vite build` production-bundle check + PWA install audit (dev-server verified; production build not exercised).
 
 ## Deliverable checklist vs definition of done
 

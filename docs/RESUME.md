@@ -60,3 +60,13 @@ NEXT: src/store (IndexedDB + codec), src/ui PWA (scan/library/compare/report scr
 Evidence: final suite 76/76 (`npx vitest run`), `npx tsc -p tsconfig.json` exit 0, `git push` output in session log.
 
 NEXT (for resuming session): read ARCHITECTURE.md → this file → build src/store/db.ts + test/store.test.ts → PWA UI per ARCHITECTURE §3/§4 → real-device WebXR smoke test.
+
+## 7 — PWA UI built + browser-verified (2026-07-08)
+
+- src/store/db.ts (IndexedDB, scans+reports stores), test/store.test.ts (codec round-trip, alias-safety, corruption rejection).
+- src/ui/: main.ts (hash router; library/scan/compare/report screens; all dynamic HTML escaped, error toasts via textContent), viewer.ts (three.js decimated point renderer + compare overlay + region wireframes — only file importing three), demo.ts (synthetic capture through the real CaptureSource seam; simulated shared marker), style.css (dark, mobile-first). index.html, vite.config.ts, public/manifest.webmanifest, public/sw.js (network-first shell cache).
+- Vocabulary sweep caught "furniture" in my own demo.ts comment — guardrail works on new code; reworded.
+- Browser verification (Playwright driving Chromium, dev server port 5179 — 5173 taken by another project): clicked full flow scan→save→rescan→save→compare→report at 390px + 1280px. Pipeline in-tab: 4 regions, alignment good 8.3 mm marker; report summary exactly matches injected demo changes. Zero console errors. Screenshots archived in docs/screenshots/.
+- Evidence: `npx vitest run` → 80/80 across 7 files; `npx tsc` exit 0; screenshots.
+
+NEXT: remaining list in docs/STATUS.md (real-device WebXR smoke, live QR detection loop in AR path, .scandiff export, production build audit).

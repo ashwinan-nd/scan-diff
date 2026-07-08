@@ -1,0 +1,95 @@
+- generic [ref=f1e2]:
+  - banner [ref=f1e151]:
+    - button "Back" [ref=f1e152] [cursor=pointer]: ← Back
+    - 'heading "Scan comparison: Demo baseline → Demo rescan" [level=1] [ref=f1e153]'
+  - main [ref=f1e154]:
+    - generic [ref=f1e155]:
+      - generic [ref=f1e156]:
+        - button "Download HTML" [ref=f1e157] [cursor=pointer]
+        - button "Print / PDF" [ref=f1e158] [cursor=pointer]
+      - iframe [ref=f1e160]:
+        - generic [active] [ref=f2e1]:
+          - banner [ref=f2e2]:
+            - 'heading "Scan comparison: Demo baseline → Demo rescan" [level=1] [ref=f2e3]'
+            - generic [ref=f2e4]:
+              - generic [ref=f2e5]: "Baseline: Demo baseline — 2026-07-08 16:25 UTC (demo (synthetic depth))"
+              - generic [ref=f2e6]: "Rescan: Demo rescan — 2026-07-08 16:26 UTC (demo (synthetic depth))"
+              - generic [ref=f2e7]: "Report generated: 2026-07-08 16:27 UTC"
+              - generic [ref=f2e8]: "Alignment: marker, good (RMSE 8.3 mm)"
+          - heading "Summary" [level=2] [ref=f2e9]
+          - generic [ref=f2e10]:
+            - paragraph [ref=f2e11]: "4 changed regions detected: 1 addition, 1 removal, 1 moved object (2 linked regions)."
+            - paragraph [ref=f2e12]: "Region 1: Material moved (paired with region 2) — 0.50 × 0.45 × 0.40 m, ≈0.035 m³, 1.1 m from scan origin."
+            - paragraph [ref=f2e13]: "Region 2: Material moved (paired with region 1) — 0.55 × 0.45 × 0.45 m, ≈0.029 m³, 1.7 m from scan origin."
+            - paragraph [ref=f2e14]: "Region 3: New material present in the second scan — 0.40 × 0.40 × 0.35 m, ≈0.027 m³, 1.1 m from scan origin."
+            - paragraph [ref=f2e15]: "Region 4: Material present in the first scan is gone in the second — 0.40 × 0.40 × 0.20 m, ≈0.013 m³, 0.9 m from scan origin."
+            - paragraph [ref=f2e16]: "Alignment: good (RMSE 8.3 mm, 97% overlap, converged in 2 iterations)."
+            - paragraph [ref=f2e17]: "Detection resolution: 5 cm voxels; smaller changes fall below the reporting floor."
+          - heading "Changed regions (4)" [level=2] [ref=f2e18]
+          - region "Moved Region 1" [ref=f2e19]:
+            - heading "Moved Region 1" [level=3] [ref=f2e20]:
+              - generic [ref=f2e21]: Moved
+              - text: Region 1
+            - paragraph [ref=f2e22]: "Region 1: Material moved (paired with region 2) — 0.50 × 0.45 × 0.40 m, ≈0.035 m³, 1.1 m from scan origin."
+            - generic [ref=f2e23]:
+              - figure "Before — frame 13 (no photo captured)" [ref=f2e24]:
+                - img "region location diagram" [ref=f2e25]:
+                  - img [ref=f2e26]
+                - generic [ref=f2e29]: Before — frame 13 (no photo captured)
+              - figure "After — frame 13 (no photo captured)" [ref=f2e30]:
+                - img "region location diagram" [ref=f2e31]:
+                  - img [ref=f2e32]
+                - generic [ref=f2e35]: After — frame 13 (no photo captured)
+          - region "Moved Region 2" [ref=f2e36]:
+            - heading "Moved Region 2" [level=3] [ref=f2e37]:
+              - generic [ref=f2e38]: Moved
+              - text: Region 2
+            - paragraph [ref=f2e39]: "Region 2: Material moved (paired with region 1) — 0.55 × 0.45 × 0.45 m, ≈0.029 m³, 1.7 m from scan origin."
+            - generic [ref=f2e40]:
+              - figure "Before — frame 22 (no photo captured)" [ref=f2e41]:
+                - img "region location diagram" [ref=f2e42]:
+                  - img [ref=f2e43]
+                - generic [ref=f2e46]: Before — frame 22 (no photo captured)
+              - figure "After — frame 22 (no photo captured)" [ref=f2e47]:
+                - img "region location diagram" [ref=f2e48]:
+                  - img [ref=f2e49]
+                - generic [ref=f2e52]: After — frame 22 (no photo captured)
+          - region "Added Region 3" [ref=f2e53]:
+            - heading "Added Region 3" [level=3] [ref=f2e54]:
+              - generic [ref=f2e55]: Added
+              - text: Region 3
+            - paragraph [ref=f2e56]: "Region 3: New material present in the second scan — 0.40 × 0.40 × 0.35 m, ≈0.027 m³, 1.1 m from scan origin."
+            - generic [ref=f2e57]:
+              - figure "Before — frame 16 (no photo captured)" [ref=f2e58]:
+                - img "region location diagram" [ref=f2e59]:
+                  - img [ref=f2e60]
+                - generic [ref=f2e63]: Before — frame 16 (no photo captured)
+              - figure "After — frame 16 (no photo captured)" [ref=f2e64]:
+                - img "region location diagram" [ref=f2e65]:
+                  - img [ref=f2e66]
+                - generic [ref=f2e69]: After — frame 16 (no photo captured)
+          - region "Removed Region 4" [ref=f2e70]:
+            - heading "Removed Region 4" [level=3] [ref=f2e71]:
+              - generic [ref=f2e72]: Removed
+              - text: Region 4
+            - paragraph [ref=f2e73]: "Region 4: Material present in the first scan is gone in the second — 0.40 × 0.40 × 0.20 m, ≈0.013 m³, 0.9 m from scan origin."
+            - generic [ref=f2e74]:
+              - figure "Before — frame 19 (no photo captured)" [ref=f2e75]:
+                - img "region location diagram" [ref=f2e76]:
+                  - img [ref=f2e77]
+                - generic [ref=f2e80]: Before — frame 19 (no photo captured)
+              - figure "After — frame 19 (no photo captured)" [ref=f2e81]:
+                - img "region location diagram" [ref=f2e82]:
+                  - img [ref=f2e83]
+                - generic [ref=f2e86]: After — frame 19 (no photo captured)
+          - contentinfo [ref=f2e87]: Generated locally by Scan-Diff. All scan data stays on this device. Detection resolution 5 cm · re-observation coverage 98% · geometric diff only — photos are annotation, not the change signal.
+  - navigation "Main" [ref=f1e161]:
+    - button "▧ Library" [ref=f1e162] [cursor=pointer]:
+      - generic [ref=f1e163]: ▧
+      - text: Library
+    - button "⊕ Scan" [ref=f1e164] [cursor=pointer]:
+      - generic [ref=f1e165]: ⊕
+      - text: Scan
+    - button "⇆ Compare" [ref=f1e166] [cursor=pointer]:
+      - generic [ref=f1e167]: ⇆
+      - text: Compare

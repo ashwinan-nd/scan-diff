@@ -1,0 +1,29 @@
+- generic [ref=f1e2]:
+  - banner [ref=f1e61]:
+    - button "Back" [ref=f1e62] [cursor=pointer]: ← Back
+    - heading "New scan" [level=1] [ref=f1e63]
+  - main [ref=f1e64]:
+    - generic [ref=f1e65]:
+      - generic [ref=f1e66]:
+        - generic:
+          - generic: 55 k points
+          - generic: frame 8/24
+          - generic: 8 keyframes
+      - generic [ref=f1e68]: This browser has no WebXR depth sensing (Chrome on an ARCore-capable Android device required). Demo mode below exercises the identical pipeline with synthetic depth.
+      - generic [ref=f1e69]: Scan name
+      - textbox "Scan name" [ref=f1e70]:
+        - /placeholder: e.g. baseline
+      - generic [ref=f1e71]:
+        - 'button "Demo: baseline" [ref=f1e72] [cursor=pointer]'
+        - 'button "Demo: rescan" [active] [ref=f1e73] [cursor=pointer]'
+      - button "Save scan" [disabled] [ref=f1e74]
+  - navigation "Main" [ref=f1e75]:
+    - button "▧ Library" [ref=f1e76] [cursor=pointer]:
+      - generic [ref=f1e77]: ▧
+      - text: Library
+    - button "⊕ Scan" [ref=f1e78] [cursor=pointer]:
+      - generic [ref=f1e79]: ⊕
+      - text: Scan
+    - button "⇆ Compare" [ref=f1e80] [cursor=pointer]:
+      - generic [ref=f1e81]: ⇆
+      - text: Compare
