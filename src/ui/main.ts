@@ -398,7 +398,8 @@ async function reviewScreen(): Promise<void> {
 </div>`;
       activeViewer = new PointCloudViewer(document.getElementById('cmp-viewer')!);
       const alignedB = transformPacked(res.transform, scanB.cloud.positions, scanB.cloud.count);
-      activeViewer.setCompareClouds(scanA.cloud, { positions: alignedB, count: scanB.cloud.count });
+      const emphasis = res.diff.regions.map((r) => ({ min: r.bboxMin, max: r.bboxMax }));
+      activeViewer.setCompareClouds(scanA.cloud, { positions: alignedB, count: scanB.cloud.count }, emphasis);
       activeViewer.addRegionBoxes(res.diff.regions);
       document.getElementById('open-report')!.addEventListener('click', () => (location.hash = `#/report/${reportId}`));
     } catch (e) {
