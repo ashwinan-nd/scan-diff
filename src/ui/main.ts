@@ -15,8 +15,9 @@ import { renderReportHtml } from '../report/html';
 import { ScanDiffError, type ScanSession } from '../core/types';
 import {
   deleteReport, deleteScan, getReport, getScan, listReports, listScans,
-  saveReport, saveScan, type ScanListEntry, type StoredReport,
+  reportsReferencingScan, saveReport, saveScan, type ScanListEntry, type StoredReport,
 } from '../store/db';
+import { filterScans, groupScans, labelCollides, sortScans, type ScanSort } from './organize';
 import { WebXRCaptureSource } from '../capture/webxr';
 import { ScanSessionBuilder } from '../capture/session';
 import { transformPacked } from '../core/mat4';
@@ -66,6 +67,60 @@ function shell(title: string, body: string, opts: { back?: boolean; tab?: Tab } 
   document.getElementById('tab-scan')!.addEventListener('click', () => (location.hash = '#/scan'));
   document.getElementById('tab-review')!.addEventListener('click', () => (location.hash = '#/review'));
   document.getElementById('tab-library')!.addEventListener('click', () => (location.hash = '#/library'));
+}
+
+/**
+ * In-app confirmation dialog (native confirm() is blocked in some embedded
+ * contexts and can't be styled). Resolves true on confirm. Focus lands on
+ * Cancel so Enter-mashing can't destroy data; Escape cancels.
+ */
+function confirmModal(title: string, detail: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.setAttribute('role', 'alertdialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'modal-title');
+
+    const h = document.createElement('p');
+    h.id = 'modal-title';
+    h.className = 'modal-title';
+    h.textContent = title;
+    const d = document.createElement('p');
+    d.className = 'modal-detail';
+    d.textContent = detail;
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.style.justifyContent = 'flex-end';
+    const cancel = document.createElement('button');
+    cancel.className = 'btn';
+    cancel.textContent = 'Cancel';
+    const confirm = document.createElement('button');
+    confirm.className = 'btn danger';
+    confirm.textContent = 'Delete';
+    row.append(cancel, confirm);
+    modal.append(h, d, row);
+    backdrop.appendChild(modal);
+    document.body.appendChild(backdrop);
+
+    const done = (v: boolean): void => {
+      backdrop.remove();
+      document.removeEventListener('keydown', onKey);
+      resolve(v);
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') done(false);
+    };
+    document.addEventListener('keydown', onKey);
+    cancel.addEventListener('click', () => done(false));
+    confirm.addEventListener('click', () => done(true));
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) done(false);
+    });
+    cancel.focus();
+  });
 }
 
 function toastError(err: unknown): void {
@@ -236,6 +291,12 @@ async function scanScreen(): Promise<void> {
     if (!pending) return;
     pending.label = labelInput.value.trim() || pending.label;
     try {
+      // non-blocking collision hint: duplicate names made scans ambiguous
+      // in Review (CRITIQUE.md) — nudge toward distinct names, don't forbid
+      const existing = await listScans();
+      if (labelCollides(pending.label, existing)) {
+        pending.label = `${pending.label} (${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })})`;
+      }
       await saveScan(pending);
       location.hash = '#/library';
     } catch (e) {
@@ -362,6 +423,7 @@ async function reviewScreen(): Promise<void> {
         scanAId: scanA.id,
         scanBId: scanB.id,
         html,
+        regionCount: res.diff.regions.length,
       });
 
       const counts = { added: 0, removed: 0, shifted: 0 };
@@ -413,6 +475,9 @@ async function reviewScreen(): Promise<void> {
 
 /* ---------------- library ---------------- */
 
+let libraryQuery = '';
+let librarySort: ScanSort = 'newest';
+
 async function libraryScreen(): Promise<void> {
   let scans: ScanListEntry[] = [];
   let reports: Array<Omit<StoredReport, 'html'>> = [];
@@ -422,10 +487,10 @@ async function libraryScreen(): Promise<void> {
     toastError(e);
   }
 
-  const scansHtml = scans.length
-    ? scans
-        .map(
-          (s) => `
+  const visible = sortScans(filterScans(scans, libraryQuery), librarySort);
+  const groups = groupScans(visible);
+
+  const scanCard = (s: ScanListEntry): string => `
 <div class="card row between" data-scan="${esc(s.id)}">
   <div>
     <p class="title">${esc(s.label)}</p>
@@ -435,36 +500,72 @@ async function libraryScreen(): Promise<void> {
     <button class="btn quiet" data-export-scan="${esc(s.id)}" aria-label="Export scan ${esc(s.label)}">Export</button>
     <button class="btn danger" data-del-scan="${esc(s.id)}" aria-label="Delete scan ${esc(s.label)}">Delete</button>
   </div>
-</div>`,
-        )
-        .join('')
-    : `<div class="empty-state"><div class="icon">&#9639;</div>No scans yet.<br>Scan or upload something, then do it again later to see what changed.</div>`;
+</div>`;
+
+  const scansHtml = scans.length === 0
+    ? `<div class="empty-state"><div class="icon">&#9639;</div>No scans yet.<br>Scan or upload something, then do it again later to see what changed.</div>`
+    : visible.length === 0
+      ? `<p class="legend">No scans match "${esc(libraryQuery)}".</p>`
+      : groups
+          .map((g) =>
+            g.name
+              ? `<div class="scan-group"><h3 class="group-label">${esc(g.name)} <span class="group-count">${g.scans.length}</span></h3><div class="cards-2col">${g.scans.map(scanCard).join('')}</div></div>`
+              : `<div class="cards-2col">${g.scans.map(scanCard).join('')}</div>`,
+          )
+          .join('');
 
   const reportsHtml = reports.length
-    ? reports
+    ? `<div class="cards-2col">${reports
         .map(
           (r) => `
 <div class="card tappable row between" data-report="${esc(r.id)}">
   <div>
     <p class="title">${esc(r.title)}</p>
-    <p class="meta">${fmtDate(r.createdAt)}</p>
+    <p class="meta">${fmtDate(r.createdAt)}${typeof r.regionCount === 'number' ? ` · <span class="change-badge${r.regionCount ? '' : ' zero'}">${r.regionCount} change${r.regionCount === 1 ? '' : 's'}</span>` : ''}</p>
   </div>
   <button class="btn danger" data-del-report="${esc(r.id)}" aria-label="Delete report">Delete</button>
 </div>`,
         )
-        .join('')
+        .join('')}</div>`
     : `<p class="legend">No reports yet — review two scans to generate one.</p>`;
 
   shell('Library', `
 <div class="stack">
   <div class="notice info">All scans stay on this device. Nothing is uploaded to any server.</div>
+  <div class="row library-controls">
+    <input type="text" id="lib-search" placeholder="Search scans…" value="${esc(libraryQuery)}" aria-label="Search scans" />
+    <select id="lib-sort" aria-label="Sort scans">
+      <option value="newest"${librarySort === 'newest' ? ' selected' : ''}>Newest</option>
+      <option value="oldest"${librarySort === 'oldest' ? ' selected' : ''}>Oldest</option>
+      <option value="name"${librarySort === 'name' ? ' selected' : ''}>Name</option>
+      <option value="points"${librarySort === 'points' ? ' selected' : ''}>Largest</option>
+    </select>
+  </div>
   <h2 class="section-label">Scans</h2>
-  <div class="cards-2col">${scansHtml}</div>
+  ${scansHtml}
   <h2 class="section-label">Reports</h2>
-  <div class="cards-2col">${reportsHtml}</div>
+  ${reportsHtml}
 </div>`, { tab: 'library' });
 
   const screen = document.getElementById('screen')!;
+  const searchEl = document.getElementById('lib-search') as HTMLInputElement;
+  let searchDebounce = 0;
+  searchEl.addEventListener('input', () => {
+    libraryQuery = searchEl.value;
+    window.clearTimeout(searchDebounce);
+    searchDebounce = window.setTimeout(() => {
+      const pos = searchEl.selectionStart ?? searchEl.value.length;
+      void libraryScreen().then(() => {
+        const el = document.getElementById('lib-search') as HTMLInputElement;
+        el.focus();
+        el.setSelectionRange(pos, pos);
+      });
+    }, 180);
+  });
+  (document.getElementById('lib-sort') as HTMLSelectElement).addEventListener('change', (e) => {
+    librarySort = (e.target as HTMLSelectElement).value as ScanSort;
+    void libraryScreen();
+  });
   screen.querySelectorAll<HTMLElement>('[data-export-scan]').forEach((b) =>
     b.addEventListener('click', async (ev) => {
       ev.stopPropagation();
@@ -485,13 +586,30 @@ async function libraryScreen(): Promise<void> {
   screen.querySelectorAll<HTMLElement>('[data-del-scan]').forEach((b) =>
     b.addEventListener('click', async (ev) => {
       ev.stopPropagation();
-      await deleteScan(b.dataset['delScan']!).catch(toastError);
-      void libraryScreen();
+      const id = b.dataset['delScan']!;
+      const scanLabel = scans.find((s) => s.id === id)?.label ?? 'this scan';
+      try {
+        const refs = await reportsReferencingScan(id);
+        const ok = await confirmModal(
+          `Delete "${scanLabel}"?`,
+          refs.length
+            ? `${refs.length} saved report${refs.length > 1 ? 's' : ''} reference${refs.length > 1 ? '' : 's'} this scan. Reports stay readable (they are self-contained), but the scan itself cannot be recovered.`
+            : 'This cannot be undone.',
+        );
+        if (!ok) return;
+        await deleteScan(id);
+        void libraryScreen();
+      } catch (e) {
+        toastError(e);
+      }
     }),
   );
   screen.querySelectorAll<HTMLElement>('[data-del-report]').forEach((b) =>
     b.addEventListener('click', async (ev) => {
       ev.stopPropagation();
+      const title = reports.find((r) => r.id === b.dataset['delReport'])?.title ?? 'this report';
+      const ok = await confirmModal(`Delete "${title}"?`, 'This cannot be undone.');
+      if (!ok) return;
       await deleteReport(b.dataset['delReport']!).catch(toastError);
       void libraryScreen();
     }),
