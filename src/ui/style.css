@@ -175,6 +175,7 @@ nav.tabbar button.active:hover { color: var(--accent); }
 .card .meta { color: var(--text-dim); font-size: var(--fs-0); font-family: var(--mono); }
 .card.tappable { cursor: pointer; transition: border-color 0.15s, background 0.15s, transform 0.1s; }
 .card.tappable:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.card.tappable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-color: var(--accent-dim); }
 .card.selected { border-color: var(--accent); background: linear-gradient(180deg, rgba(77, 163, 255, 0.09), rgba(77, 163, 255, 0.03)); }
 
 .section-label {
@@ -269,7 +270,14 @@ label { font-size: var(--fs-0); color: var(--text-dim); }
 .stat .v { font-family: var(--mono); font-size: var(--fs-4); font-weight: 700; letter-spacing: -0.02em; }
 .stat .k { font-size: var(--fs-0); color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.07em; }
 
-iframe.report-frame { width: 100%; height: 100%; border: 0; border-radius: var(--radius); background: #fff; }
+/* report screen: definite-height chain so the iframe fills the viewport.
+   height:100% on a replaced element silently collapses to the 150px UA
+   default when any ancestor has auto height — every link below is explicit. */
+main.screen.screen-fill { display: flex; flex-direction: column; overflow: hidden; }
+.content-fill { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; width: 100%; }
+.report-layout { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.report-frame-wrap { flex: 1 1 auto; min-height: 0; }
+iframe.report-frame { width: 100%; height: 100%; border: 0; border-radius: var(--radius); background: #fff; display: block; }
 
 .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: var(--fs-0); color: var(--text-dim); align-items: center; }
 

@@ -270,11 +270,13 @@ async function reviewScreen(): Promise<void> {
     return;
   }
 
+  // pickable cards are real radio controls: keyboard-only users must be able
+  // to complete the core compare flow (CRITIQUE.md breaking finding #2)
   const pick = (slot: string): string =>
     scans
       .map(
         (s) => `
-<div class="card tappable" data-pick="${slot}:${esc(s.id)}">
+<div class="card tappable" role="radio" aria-checked="false" tabindex="0" data-pick="${slot}:${esc(s.id)}">
   <p class="title">${esc(s.label)}</p>
   <p class="meta">${fmtDate(s.createdAt)} · ${fmtPoints(s.pointCount)} pts${s.hasAnchor ? ' · marker' : ''}</p>
 </div>`,
@@ -285,12 +287,12 @@ async function reviewScreen(): Promise<void> {
 <div class="stack">
   <div class="grid-2">
     <div class="stack">
-      <h2 class="section-label">1 · Before (baseline)</h2>
-      <div id="pick-a" class="stack">${pick('a')}</div>
+      <h2 class="section-label" id="label-pick-a">1 · Before (baseline)</h2>
+      <div id="pick-a" class="stack" role="radiogroup" aria-labelledby="label-pick-a">${pick('a')}</div>
     </div>
     <div class="stack">
-      <h2 class="section-label">2 · After (rescan)</h2>
-      <div id="pick-b" class="stack">${pick('b')}</div>
+      <h2 class="section-label" id="label-pick-b">2 · After (rescan)</h2>
+      <div id="pick-b" class="stack" role="radiogroup" aria-labelledby="label-pick-b">${pick('b')}</div>
     </div>
   </div>
   <h2 class="section-label">Detection strictness</h2>
@@ -318,15 +320,26 @@ async function reviewScreen(): Promise<void> {
     }),
   );
 
-  document.querySelectorAll<HTMLElement>('[data-pick]').forEach((card) =>
-    card.addEventListener('click', () => {
+  document.querySelectorAll<HTMLElement>('[data-pick]').forEach((card) => {
+    const select = (): void => {
       const [slot, id] = card.dataset['pick']!.split(':') as ['a' | 'b', string];
       sel[slot] = id;
-      card.parentElement!.querySelectorAll('.card').forEach((c) => c.classList.remove('selected'));
+      card.parentElement!.querySelectorAll('.card').forEach((c) => {
+        c.classList.remove('selected');
+        c.setAttribute('aria-checked', 'false');
+      });
       card.classList.add('selected');
+      card.setAttribute('aria-checked', 'true');
       runBtn.disabled = !(sel.a && sel.b && sel.a !== sel.b);
-    }),
-  );
+    };
+    card.addEventListener('click', select);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        select();
+      }
+    });
+  });
 
   runBtn.addEventListener('click', async () => {
     runBtn.disabled = true;
@@ -495,13 +508,19 @@ async function reportScreen(id: string): Promise<void> {
     return;
   }
   shell(report.title, `
-<div class="stack" style="height:100%">
+<div class="report-layout">
   <div class="row">
     <button class="btn" id="dl-report">Download HTML</button>
     <button class="btn" id="print-report">Print / PDF</button>
   </div>
-  <div style="flex:1;min-height:60dvh"><iframe class="report-frame" id="report-frame" title="Change report"></iframe></div>
+  <div class="report-frame-wrap"><iframe class="report-frame" id="report-frame" title="Change report"></iframe></div>
 </div>`, { back: true, tab: 'library' });
+  // the report screen is the one screen that should own the full viewport
+  // height (the iframe IS the content); flag the containers so CSS can give
+  // the whole chain a definite height — percentage heights on a replaced
+  // element never resolve through an auto-height ancestor (CRITIQUE.md #1)
+  document.querySelector('main.screen')!.classList.add('screen-fill');
+  document.getElementById('screen')!.classList.add('content-fill');
 
   const frame = document.getElementById('report-frame') as HTMLIFrameElement;
   frame.srcdoc = report.html;
