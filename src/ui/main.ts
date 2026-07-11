@@ -9,6 +9,7 @@
  * All pipeline work happens in this tab (no server; local-first).
  */
 
+import '@fontsource-variable/inter/index.css';
 import './style.css';
 import { comparePipeline } from '../pipeline';
 import { renderReportHtml } from '../report/html';
@@ -125,13 +126,23 @@ function confirmModal(title: string, detail: string): Promise<boolean> {
 
 function toastError(err: unknown): void {
   const msg = err instanceof ScanDiffError ? err.message : err instanceof Error ? err.message : String(err);
+  // top-right stacking toasts: the old bottom-center placement covered the
+  // scan-name input and demo buttons while visible (CRITIQUE.md polish)
+  let host = document.getElementById('toast-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'toast-host';
+    document.body.appendChild(host);
+  }
   const el = document.createElement('div');
-  el.className = 'notice bad';
-  el.style.cssText = 'position:fixed;left:16px;right:16px;bottom:76px;z-index:50;max-width:688px;margin:0 auto;';
+  el.className = 'notice bad toast';
   el.setAttribute('role', 'alert');
   el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 6000);
+  host.appendChild(el);
+  setTimeout(() => {
+    el.classList.add('leaving');
+    setTimeout(() => el.remove(), 250);
+  }, 6000);
 }
 
 /* ---------------- scan (default landing) ---------------- */
