@@ -164,6 +164,28 @@ describe('report model + html', () => {
     expect(html).toContain('<rect');
   });
 
+  it('carries its own identity and hierarchy: masthead, wordmark, stat band, meters', () => {
+    const model = buildReportModel(session('a'), session('b'), diff, QUALITY, 'marker', session('b').keyframes);
+    const html = renderReportHtml(model, { scanA: new Map(), scanB: new Map() });
+    expect(html).toContain('class="masthead"');
+    expect(html).toContain('scan-diff');
+    expect(html).toContain('Change report');
+    expect(html).toContain('class="statband"');
+    expect(html).toContain('class="meter-fill"');
+    // largest region gets the full-width volume bar
+    expect(html).toContain('width:100%');
+  });
+
+  it('photo-less evidence renders an informative footprint map, not an empty box', () => {
+    const model = buildReportModel(session('a'), session('b'), diff, QUALITY, 'marker', session('b').keyframes);
+    const html = renderReportHtml(model, { scanA: new Map(), scanB: new Map() });
+    expect(html).toContain('class="ev-map"');
+    expect(html).toContain('location map (no photo captured)');
+    expect(html).toContain('scan origin');
+    // one solid + ghosted rects per region pair; at minimum the solid fill exists
+    expect(html).toContain('fill-opacity="0.55"');
+  });
+
   it('zero-region report renders the clean-match message', () => {
     const empty: DiffResult = { ...diff, regions: [], addedVoxels: 0, removedVoxels: 0 };
     const model = buildReportModel(session('a'), session('b'), empty, QUALITY, 'yaw-search', []);
