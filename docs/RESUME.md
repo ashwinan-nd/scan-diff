@@ -93,3 +93,21 @@ NEXT: real-device ARCore smoke test + live QR loop remain the only hardware-gate
 - Evidence: 109/109 tests across 11 files; tsc clean; `npm run build` clean; prod smoke via Playwright.
 
 NEXT (hardware only): ARCore device smoke test; wire live RGB frames (WebXR camera-access) into detectAnchorInFrame + keyframe photos.
+
+## 10 — Independent critique pass (2026-07-10)
+
+- docs/CRITIQUE.md: adversarial Playwright review, no code changes. 2 BREAKING (report iframe 150px collapse; keyboard-inaccessible pickers), 5 DEGRADED, 3 POLISH. Evidence: docs/critique-evidence/. Backend correctness + privacy verified intact.
+
+## 11 — Critique resolution + design elevation (2026-07-11)
+
+- ALL CRITIQUE.md findings fixed; per-finding evidence in docs/CRITIQUE-RESOLUTIONS.md. Highlights:
+  - Report iframe: definite-height flex chain → 85% viewport (was 150px fixed).
+  - Pickers: real radios, keyboard flow driven end-to-end.
+  - Layout: 0px centering offset (was 72), two-pane Review/Scan ≥1280px, 1400px cap ≥1440px.
+  - Viewer: height-ramp vertex colors (viewer-math.ts pure + 10 tests), context dimming w/ vivid change regions, auto-frame + reset + orbit clamps. Gotcha for future work: three r152+ treats vertex colors as linear — design-space (sRGB) values must be pow(2.2)-converted or everything washes pale.
+  - Report: masthead/wordmark, stat band, size/confidence meters, footprint maps for photo-less evidence.
+  - Library: search/sort/stem-grouping (organize.ts, 8 tests), delete confirm w/ referencing-report counts, collision auto-suffix, change badges (StoredReport.regionCount, optional for old rows).
+  - Design: Inter Variable (OFL, bundled), --text-faint → #7e889b (5.45/5.16:1 AA), top-right stacking toasts, layered shadows, three.js chunk split (shell 72.7kB). Vite 8/rolldown needs function-form manualChunks; worktree symlinked node_modules needs server.fs.allow.
+- Evidence: 129/129 tests, tsc clean, `npm run build` clean, privacy re-verified (zero non-localhost requests), screenshots docs/screenshots/v3-*.png.
+
+NEXT (hardware only, unchanged): ARCore device smoke test; live RGB feed for QR detection + keyframe photos.

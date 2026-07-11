@@ -18,6 +18,8 @@ export interface StoredReport {
   scanAId: string;
   scanBId: string;
   html: string;
+  /** change count summary for list badges; absent on reports saved before v0.2 */
+  regionCount?: number;
 }
 
 export interface ScanListEntry {
@@ -83,6 +85,12 @@ export async function listScans(): Promise<ScanListEntry[]> {
 
 export async function deleteScan(id: string): Promise<void> {
   await tx('scans', 'readwrite', (s) => s.delete(id));
+}
+
+/** Reports that reference a scan — powers the delete-confirmation warning. */
+export async function reportsReferencingScan(scanId: string): Promise<Array<Omit<StoredReport, 'html'>>> {
+  const all = await listReports();
+  return all.filter((r) => r.scanAId === scanId || r.scanBId === scanId);
 }
 
 export async function saveReport(report: StoredReport): Promise<void> {
