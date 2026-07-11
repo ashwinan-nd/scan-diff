@@ -52,9 +52,9 @@ function shell(title: string, body: string, opts: { back?: boolean; tab?: Tab } 
   teardown();
   app.innerHTML = `
 <header class="topbar">
-  ${opts.back ? '<button class="back" id="nav-back" aria-label="Back">&larr; Back</button>' : '<span></span>'}
+  ${opts.back ? '<button class="back" id="nav-back" aria-label="Back">&larr; Back</button>' : '<span style="width:72px"></span>'}
   <h1>${esc(title)}</h1>
-  <span style="width:56px"></span>
+  <span style="width:72px"></span>
 </header>
 <main class="screen"><div class="content" id="screen">${body}</div></main>
 <nav class="tabbar" aria-label="Main">
@@ -85,7 +85,7 @@ async function scanScreen(): Promise<void> {
   const xrOk = await WebXRCaptureSource.isSupported().catch(() => false);
 
   shell('New scan', `
-<div class="stack">
+<div class="scan-grid">
   <div class="viewer-wrap" id="viewer">
     <div class="hud">
       <span class="pill" id="hud-points">0 points</span>
@@ -93,23 +93,25 @@ async function scanScreen(): Promise<void> {
       <span class="pill good" id="hud-kf" style="display:none">0 keyframes</span>
     </div>
   </div>
-  ${xrOk
-    ? '<div class="notice info">AR depth capture available. Place a printed QR code in the scene — the same code links this scan to future rescans.</div>'
-    : ''}
-  <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Upload a scan file">
-    Drop a scan file here, or tap to choose
-    <div class="hint">.ply from Polycam, Scaniverse, 3D Scanner App — or a .scandiff exported from another device</div>
+  <div class="stack">
+    ${xrOk
+      ? '<div class="notice info">AR depth capture available. Place a printed QR code in the scene — the same code links this scan to future rescans.</div>'
+      : ''}
+    <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Upload a scan file">
+      Drop a scan file here, or tap to choose
+      <div class="hint">.ply from Polycam, Scaniverse, 3D Scanner App — or a .scandiff exported from another device</div>
+    </div>
+    <input type="file" id="file-input" accept=".ply,${EXCHANGE_EXTENSION}" style="display:none" />
+    <label for="scan-label">Scan name</label>
+    <input type="text" id="scan-label" maxlength="80" placeholder="e.g. baseline" value="" />
+    <div class="row" style="flex-wrap:wrap">
+      ${xrOk ? '<button class="btn primary" id="start-xr" style="flex:1">Start AR scan</button>' : ''}
+      <button class="btn ${xrOk ? '' : 'primary'}" id="start-demo-a" style="flex:1">Demo: baseline</button>
+      <button class="btn" id="start-demo-b" style="flex:1">Demo: rescan</button>
+    </div>
+    <button class="btn block" id="save-scan" disabled>Save scan</button>
+    ${xrOk ? '' : '<p class="legend">No AR depth on this browser (needs Chrome on ARCore Android). Upload a scan file above, or run the demo — both use the identical pipeline.</p>'}
   </div>
-  <input type="file" id="file-input" accept=".ply,${EXCHANGE_EXTENSION}" style="display:none" />
-  <label for="scan-label">Scan name</label>
-  <input type="text" id="scan-label" placeholder="e.g. baseline" value="" />
-  <div class="row" style="flex-wrap:wrap">
-    ${xrOk ? '<button class="btn primary" id="start-xr" style="flex:1">Start AR scan</button>' : ''}
-    <button class="btn ${xrOk ? '' : 'primary'}" id="start-demo-a" style="flex:1">Demo: baseline</button>
-    <button class="btn" id="start-demo-b" style="flex:1">Demo: rescan</button>
-  </div>
-  <button class="btn block" id="save-scan" disabled>Save scan</button>
-  ${xrOk ? '' : '<p class="legend">No AR depth on this browser (needs Chrome on ARCore Android). Upload a scan file above, or run the demo — both use the identical pipeline.</p>'}
 </div>`, { tab: 'scan' });
 
   const viewerEl = document.getElementById('viewer')!;
@@ -366,29 +368,33 @@ async function reviewScreen(): Promise<void> {
       for (const r of res.diff.regions) counts[r.kind]++;
       const resultEl = document.getElementById('compare-result')!;
       resultEl.innerHTML = `
-<div class="stack" style="margin-top:14px">
-  <div class="stats">
-    <div class="stat"><div class="v">${res.diff.regions.length}</div><div class="k">regions</div></div>
-    <div class="stat"><div class="v" style="color:var(--good)">${counts.added}</div><div class="k">added</div></div>
-    <div class="stat"><div class="v" style="color:var(--bad)">${counts.removed}</div><div class="k">removed</div></div>
-    <div class="stat"><div class="v" style="color:var(--warn)">${counts.shifted}</div><div class="k">moved</div></div>
-    <div class="stat"><div class="v">${(res.quality.rmse * 1000).toFixed(1)}<span style="font-size:0.5em"> mm</span></div><div class="k">align RMSE</div></div>
+<div class="result-grid" style="margin-top:14px">
+  <div class="stack">
+    <div class="viewer-wrap" id="cmp-viewer"></div>
+    <div class="legend">
+      <span><span style="color:var(--accent)">&#9679;</span> before</span>
+      <span><span style="color:#33d17a">&#9679;</span> after (aligned)</span>
+      <span class="badge added">added</span>
+      <span class="badge removed">removed</span>
+      <span class="badge shifted">moved</span>
+    </div>
   </div>
-  <div class="notice ${res.diff.regions.length ? 'warn' : 'info'}">
-    ${res.diff.regions.length
-      ? `Changes detected at ${esc(STRICTNESS_OPTS[strict].label)} — inspect below, then open the report.`
-      : 'No geometric changes at this detection resolution.'}
-    Alignment ${esc(res.quality.verdict)} via ${esc(res.alignmentMethod)}.
+  <div class="stack">
+    <div class="stats">
+      <div class="stat"><div class="v">${res.diff.regions.length}</div><div class="k">regions</div></div>
+      <div class="stat"><div class="v" style="color:var(--good)">${counts.added}</div><div class="k">added</div></div>
+      <div class="stat"><div class="v" style="color:var(--bad)">${counts.removed}</div><div class="k">removed</div></div>
+      <div class="stat"><div class="v" style="color:var(--warn)">${counts.shifted}</div><div class="k">moved</div></div>
+      <div class="stat"><div class="v">${(res.quality.rmse * 1000).toFixed(1)}<span style="font-size:0.5em"> mm</span></div><div class="k">align RMSE</div></div>
+    </div>
+    <div class="notice ${res.diff.regions.length ? 'warn' : 'info'}">
+      ${res.diff.regions.length
+        ? `Changes detected at ${esc(STRICTNESS_OPTS[strict].label)} — inspect the view, then open the report.`
+        : 'No geometric changes at this detection resolution.'}
+      Alignment ${esc(res.quality.verdict)} via ${esc(res.alignmentMethod)}.
+    </div>
+    <button class="btn primary block" id="open-report">Open report</button>
   </div>
-  <div class="viewer-wrap" id="cmp-viewer"></div>
-  <div class="legend">
-    <span><span style="color:var(--accent)">&#9679;</span> before</span>
-    <span><span style="color:#33d17a">&#9679;</span> after (aligned)</span>
-    <span class="badge added">added</span>
-    <span class="badge removed">removed</span>
-    <span class="badge shifted">moved</span>
-  </div>
-  <button class="btn primary block" id="open-report">Open report</button>
 </div>`;
       activeViewer = new PointCloudViewer(document.getElementById('cmp-viewer')!);
       const alignedB = transformPacked(res.transform, scanB.cloud.positions, scanB.cloud.count);
@@ -452,9 +458,9 @@ async function libraryScreen(): Promise<void> {
 <div class="stack">
   <div class="notice info">All scans stay on this device. Nothing is uploaded to any server.</div>
   <h2 class="section-label">Scans</h2>
-  ${scansHtml}
+  <div class="cards-2col">${scansHtml}</div>
   <h2 class="section-label">Reports</h2>
-  ${reportsHtml}
+  <div class="cards-2col">${reportsHtml}</div>
 </div>`, { tab: 'library' });
 
   const screen = document.getElementById('screen')!;

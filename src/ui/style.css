@@ -136,6 +136,34 @@ nav.tabbar button.active:hover { color: var(--accent); }
   }
   nav.tabbar button.active { background: var(--accent-soft); }
   .content { max-width: 1040px; }
+  /* center content relative to the WINDOW, not the post-rail main area:
+     the 200px rail pushes the visual center 100px right without this
+     (measured 72px off true center in CRITIQUE.md) */
+  main.screen { padding-right: calc(var(--pad) + 200px); }
+  header.topbar { padding-right: calc(var(--pad) + 200px); }
+}
+
+/* wide desktop: actually use the space instead of stranding a narrow column */
+@media (min-width: 1440px) {
+  .content { max-width: 1400px; }
+}
+
+/* two-pane work layouts at >=1280px */
+.scan-grid, .result-grid { display: flex; flex-direction: column; gap: 12px; }
+@media (min-width: 1280px) {
+  .scan-grid {
+    display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+    gap: 16px; align-items: start;
+  }
+  .scan-grid .viewer-wrap { aspect-ratio: auto; height: min(72dvh, 760px); }
+  .result-grid {
+    display: grid; grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 16px; align-items: start;
+  }
+  .result-grid .viewer-wrap { aspect-ratio: auto; height: min(68dvh, 720px); }
+  .result-grid .stats { grid-template-columns: 1fr 1fr; }
+  .cards-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cards-2col .card + .card { margin-top: 0; }
 }
 
 /* ---- primitives ---- */
